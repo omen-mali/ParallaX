@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { stringify } from "yaml";
 
 import { STORE_SCHEMA_VERSION, type NormalizedChat } from "../contract/types.js";
 import type { VerifiedImportDelta } from "../importer/verify.js";
 
-const STORE_DIRECTORY = ".parallax";
+export const DEFAULT_STORE_DIRECTORY = ".parallax";
 const ISO_NOW = () => new Date().toISOString();
 
 export interface StorePaths {
@@ -20,8 +20,30 @@ export interface StorePaths {
   manifest: string;
 }
 
-export function storePaths(projectRoot: string): StorePaths {
-  const root = join(projectRoot, STORE_DIRECTORY);
+export function resolveStoreRoot(
+  projectRoot: string,
+  storePath = DEFAULT_STORE_DIRECTORY,
+): string {
+  if (storePath.length === 0 || isAbsolute(storePath)) {
+    throw new Error("--store must be a non-empty path relative to the project root.");
+  }
+
+  const resolvedProjectRoot = resolve(projectRoot);
+  const root = resolve(resolvedProjectRoot, storePath);
+  const relativePath = relative(resolvedProjectRoot, root);
+  if (
+    relativePath.length === 0 ||
+    relativePath === ".." ||
+    relativePath.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) ||
+    isAbsolute(relativePath)
+  ) {
+    throw new Error("--store must stay inside the project root.");
+  }
+  return root;
+}
+
+export function storePaths(storeRoot: string): StorePaths {
+  const root = resolve(storeRoot);
   return {
     root,
     sources: join(root, "sources"),
@@ -34,8 +56,8 @@ export function storePaths(projectRoot: string): StorePaths {
   };
 }
 
-export async function initializeStore(projectRoot: string): Promise<StorePaths> {
-  const paths = storePaths(projectRoot);
+export async function initializeStore(storeRoot: string): Promise<StorePaths> {
+  const paths = storePaths(storeRoot);
   await mkdir(paths.sources, { recursive: true });
   await mkdir(paths.decisions, { recursive: true });
 
@@ -45,7 +67,6 @@ export async function initializeStore(projectRoot: string): Promise<StorePaths> 
       stringify({
         schemaVersion: STORE_SCHEMA_VERSION,
         kind: "manifest",
-        createdAt: ISO_NOW(),
       }),
     ],
     [paths.tasks, "# ParallaX Tasks\n"],
@@ -69,11 +90,11 @@ export async function initializeStore(projectRoot: string): Promise<StorePaths> 
 }
 
 export async function sourceAlreadyImported(
-  projectRoot: string,
+  storeRoot: string,
   sourceId: string,
 ): Promise<boolean> {
   try {
-    await readFile(join(storePaths(projectRoot).sources, `${sourceId}.md`), "utf8");
+    await readFile(join(storePaths(storeRoot).sources, `${sourceId}.md`), "utf8");
     return true;
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -148,7 +169,7 @@ function ownedBlock(
 }
 
 export interface ApplyImportOptions {
-  projectRoot: string;
+  storeRoot: string;
   chat: NormalizedChat;
   rawHash: string;
   delta: VerifiedImportDelta;
@@ -156,9 +177,9 @@ export interface ApplyImportOptions {
 }
 
 export async function applyImport(options: ApplyImportOptions): Promise<void> {
-  const paths = await initializeStore(options.projectRoot);
+  const paths = await initializeStore(options.storeRoot);
   const sourcePath = join(paths.sources, `${options.chat.id}.md`);
-  if (await sourceAlreadyImported(options.projectRoot, options.chat.id)) {
+  if (await sourceAlreadyImported(options.storeRoot, options.chat.id)) {
     throw new Error(`Source ${options.chat.id} was already imported.`);
   }
 

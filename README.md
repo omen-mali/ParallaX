@@ -29,7 +29,8 @@ pnpm run check
 pnpm run dev -- init
 ```
 
-`init` creates only `.parallax/`. For live imports, add a local `.env`
+`init` creates the durable `.parallax/` store. Commit this plain-file,
+human-editable project brain to Git. For live imports, add a local `.env`
 (gitignored) from the tracked template, or prompt for a key on a TTY:
 
 ```sh
@@ -54,6 +55,22 @@ parallax compile
 parallax serve
 parallax web
 ```
+
+Every store-facing command accepts `--store <path>`. Paths are relative to the
+project root (`--root`) and must remain inside it. The default is `.parallax`.
+Use an ignored alternate store for demos or exploratory imports:
+
+```sh
+parallax init --store .parallax.local
+PARALLAX_MOCK=1 parallax import chat.md --apply --store .parallax.local
+```
+
+`.parallax/.local/`, `.parallax.local/`, and `.parallax-demo/` are local-only
+and ignored. The canonical `.parallax/` store—including `sources/`—is tracked
+so evidence remains independently verifiable. Imports retain their normalized
+source transcript by default. For sensitive material, use `--metadata-only` to
+store source metadata without transcript text, or use an ignored local store.
+ParallaX never silently changes the retention choice.
 
 The live importer uses GPT-5.6 through the Responses API and validates its
 structured proposal with Zod. A deterministic mock mode extracts only explicit,

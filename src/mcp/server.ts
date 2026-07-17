@@ -59,7 +59,7 @@ export function searchSnapshot(snapshot: StoreSnapshot, query: string): SearchRe
     );
 }
 
-export function createMcpServer(projectRoot: string): McpServer {
+export function createMcpServer(storeRoot: string): McpServer {
   const server = new McpServer({ name: "parallax", version: "0.1.0" });
 
   server.registerTool(
@@ -67,7 +67,7 @@ export function createMcpServer(projectRoot: string): McpServer {
     {
       description: "Get concise approved project context from the ParallaX store.",
     },
-    async () => textResult({ context: renderContext(await readStore(projectRoot)) }),
+    async () => textResult({ context: renderContext(await readStore(storeRoot)) }),
   );
 
   server.registerTool(
@@ -76,8 +76,7 @@ export function createMcpServer(projectRoot: string): McpServer {
       description: "Search approved decisions and tasks with lexical scoring.",
       inputSchema: { query: z.string().min(1) },
     },
-    async ({ query }) =>
-      textResult(searchSnapshot(await readStore(projectRoot), query)),
+    async ({ query }) => textResult(searchSnapshot(await readStore(storeRoot), query)),
   );
 
   server.registerTool(
@@ -87,7 +86,7 @@ export function createMcpServer(projectRoot: string): McpServer {
       inputSchema: { id: z.string().min(1) },
     },
     async ({ id }) => {
-      const decision = (await readStore(projectRoot)).decisions.find(
+      const decision = (await readStore(storeRoot)).decisions.find(
         (candidate) => candidate.id === id,
       );
       if (decision === undefined) {
@@ -107,7 +106,7 @@ export function createMcpServer(projectRoot: string): McpServer {
       inputSchema: { status: z.enum(["open", "done"]).optional() },
     },
     async ({ status }) => {
-      const tasks = (await readStore(projectRoot)).tasks.filter(
+      const tasks = (await readStore(storeRoot)).tasks.filter(
         (task) => status === undefined || task.status === status,
       );
       return textResult(tasks);
@@ -117,7 +116,7 @@ export function createMcpServer(projectRoot: string): McpServer {
   return server;
 }
 
-export async function serveMcp(projectRoot: string): Promise<void> {
-  const server = createMcpServer(projectRoot);
+export async function serveMcp(storeRoot: string): Promise<void> {
+  const server = createMcpServer(storeRoot);
   await server.connect(new StdioServerTransport());
 }

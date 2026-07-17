@@ -69,10 +69,10 @@ export function renderTimelineHtml(snapshot: StoreSnapshot): string {
 }
 
 export async function generateTimeline(
-  projectRoot: string,
+  storeRoot: string,
   outputPath: string,
 ): Promise<void> {
-  const snapshot = await readStore(projectRoot);
+  const snapshot = await readStore(storeRoot);
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, renderTimelineHtml(snapshot), "utf8");
 }
