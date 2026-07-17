@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { packageName } from "./index.js";
+import { optionValue, positionalArguments } from "./cli-options.js";
 import { compileContext, type CompileTarget } from "./compiler/compiler.js";
 import {
   assertApiKeyNotPassedOnCli,
@@ -21,6 +22,7 @@ import {
   applyImport,
   formatProposal,
   initializeStore,
+  resolveStoreRoot,
   sourceAlreadyImported,
 } from "./store/store.js";
 import { readStore, toStoreDigest } from "./store/read.js";
@@ -29,22 +31,22 @@ import { generateTimeline } from "./web/timeline.js";
 const help = `ParallaX (${packageName})
 
 Usage:
-  parallax <command>
+  parallax <command> [--root <path>] [--store <path>]
 
 Commands:
   init       Create a .parallax project brain
              --env       Create .env from the template if absent
              --api-key   Prompt securely for OPENAI_API_KEY
   import     Distill a chat export into a reviewable proposal
+             --metadata-only  Do not retain normalized transcript text
   compile    Render approved context for AI tools
   serve      Expose approved context over MCP
   web        Generate a static decision timeline
-`;
 
-function optionValue(args: string[], option: string): string | undefined {
-  const index = args.indexOf(option);
-  return index === -1 ? undefined : args[index + 1];
-}
+Store options:
+  --root     Project root (default: current directory)
+  --store    Store path relative to root (default: .parallax)
+`;
 
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
@@ -54,11 +56,15 @@ async function main(): Promise<void> {
   }
 
   const projectRoot = resolve(optionValue(args, "--root") ?? process.cwd());
+  const storeRoot = resolveStoreRoot(
+    projectRoot,
+    optionValue(args, "--store") ?? undefined,
+  );
   loadProjectEnv(projectRoot);
 
   if (command === "init") {
     assertApiKeyNotPassedOnCli(args);
-    const paths = await initializeStore(projectRoot);
+    const paths = await initializeStore(storeRoot);
     process.stdout.write(`Initialized ${paths.root}\n`);
 
     const envExistedBefore = await envFileExists(projectRoot);
@@ -89,19 +95,17 @@ async function main(): Promise<void> {
   }
 
   if (command === "import") {
-    const file = args.find(
-      (argument, index) => !argument.startsWith("--") && args[index - 1] !== "--root",
-    );
+    const file = positionalArguments(args)[0];
     if (file === undefined) {
       throw new Error("Usage: parallax import <chat-export> [--apply] [--mock]");
     }
     const rawContents = await readFile(resolve(file), "utf8");
     const parsed = parseGenericMarkdown(rawContents, file);
-    if (await sourceAlreadyImported(projectRoot, parsed.chat.id)) {
+    if (await sourceAlreadyImported(storeRoot, parsed.chat.id)) {
       throw new Error(`Source ${parsed.chat.id} was already imported.`);
     }
 
-    const digest = toStoreDigest(await readStore(projectRoot));
+    const digest = toStoreDigest(await readStore(storeRoot));
     const mockMode = process.env.PARALLAX_MOCK === "1" || args.includes("--mock");
     const candidate = mockMode
       ? distillWithMock(parsed.chat)
@@ -113,13 +117,13 @@ async function main(): Promise<void> {
 
     if (args.includes("--apply")) {
       await applyImport({
-        projectRoot,
+        storeRoot,
         chat: parsed.chat,
         rawHash: parsed.rawHash,
         delta: verified,
         metadataOnly: args.includes("--metadata-only"),
       });
-      process.stdout.write("Applied proposal to .parallax/\n");
+      process.stdout.write(`Applied proposal to ${storeRoot}\n`);
     } else {
       process.stdout.write("Preview only. Re-run with --apply to persist it.\n");
     }
@@ -130,7 +134,7 @@ async function main(): Promise<void> {
     const requestedTarget = optionValue(args, "--target");
     const targets =
       requestedTarget === undefined ? undefined : [requestedTarget as CompileTarget];
-    const compiled = await compileContext(projectRoot, targets);
+    const compiled = await compileContext(projectRoot, storeRoot, targets);
     for (const { path } of compiled) {
       process.stdout.write(`Compiled ${path}\n`);
     }
@@ -142,13 +146,13 @@ async function main(): Promise<void> {
       projectRoot,
       optionValue(args, "--out") ?? "docs/index.html",
     );
-    await generateTimeline(projectRoot, output);
+    await generateTimeline(storeRoot, output);
     process.stdout.write(`Generated ${output}\n`);
     return;
   }
 
   if (command === "serve") {
-    await serveMcp(projectRoot);
+    await serveMcp(storeRoot);
     return;
   }
 

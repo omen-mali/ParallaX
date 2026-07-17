@@ -4,7 +4,9 @@ dist/
 coverage/
 test-results/
 *.tsbuildinfo
-.parallax/
+.parallax/.local/
+.parallax.local/
+.parallax-demo/
 .DS_Store
 AGENTS.md
 message.txt

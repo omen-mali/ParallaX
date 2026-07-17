@@ -54,8 +54,8 @@ function stringValue(value: unknown, field: string): string {
   return value;
 }
 
-async function readDecisions(projectRoot: string): Promise<StoredDecision[]> {
-  const paths = storePaths(projectRoot);
+async function readDecisions(storeRoot: string): Promise<StoredDecision[]> {
+  const paths = storePaths(storeRoot);
   let entries: string[];
   try {
     entries = await readdir(paths.decisions);
@@ -101,10 +101,10 @@ async function readDecisions(projectRoot: string): Promise<StoredDecision[]> {
   return decisions.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
-async function readTasks(projectRoot: string): Promise<StoredTask[]> {
+async function readTasks(storeRoot: string): Promise<StoredTask[]> {
   let contents: string;
   try {
-    contents = await readFile(storePaths(projectRoot).tasks, "utf8");
+    contents = await readFile(storePaths(storeRoot).tasks, "utf8");
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return [];
@@ -127,10 +127,10 @@ async function readTasks(projectRoot: string): Promise<StoredTask[]> {
   });
 }
 
-export async function readStore(projectRoot: string): Promise<StoreSnapshot> {
+export async function readStore(storeRoot: string): Promise<StoreSnapshot> {
   const [decisions, tasks] = await Promise.all([
-    readDecisions(projectRoot),
-    readTasks(projectRoot),
+    readDecisions(storeRoot),
+    readTasks(storeRoot),
   ]);
   return { decisions, tasks };
 }
