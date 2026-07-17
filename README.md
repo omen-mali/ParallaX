@@ -19,20 +19,36 @@ The project foundation and validation contract are in place. The upcoming
 milestones add the validated import pipeline, compiler, static timeline, and
 MCP read tools.
 
-## Development
+## Setup
 
 Requires Node.js 20 or later.
 
 ```sh
 pnpm install
 pnpm run check
-pnpm run dev -- --help
+pnpm run dev -- init
 ```
 
-## Planned commands
+`init` creates only `.parallax/`. For live imports, add a local `.env`
+(gitignored) from the tracked template, or prompt for a key on a TTY:
+
+```sh
+pnpm run dev -- init --env
+pnpm run dev -- init --api-key
+```
+
+`--env` creates `.env` from `.env.example` only when it is absent.
+`--api-key` never accepts the key on the command line; it prompts securely,
+writes `OPENAI_API_KEY`, and sets owner-only permissions where supported.
+Existing shell environment variables always take precedence over `.env`.
+Mock mode needs no key.
+
+## Commands
 
 ```text
 parallax init
+parallax init --env
+parallax init --api-key
 parallax import <chat-export>
 parallax compile
 parallax serve
@@ -58,9 +74,9 @@ PARALLAX_MOCK=1 pnpm run dev -- import chat.md
 PARALLAX_MOCK=1 pnpm run dev -- import chat.md --apply
 ```
 
-For a live import, set `OPENAI_API_KEY` in your environment and run
-`pnpm run dev -- import chat.md`. API keys are never written, displayed, or
-stored by ParallaX. Use `--model <name>` to override the default model.
+For a live import, ensure `OPENAI_API_KEY` is set (via the environment or
+`.env`) and run `pnpm run dev -- import chat.md`. Use `--model <name>` or
+`PARALLAX_MODEL` to override the default model.
 
 `compile` writes concise, approved context into safe managed blocks in
 `AGENTS.md`, `CLAUDE.md`, and `.cursor/rules/parallax.mdc`. It refuses malformed
