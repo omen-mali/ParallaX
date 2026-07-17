@@ -1,0 +1,41 @@
+{
+  "name": "@omen-mali/parallax",
+  "version": "0.1.0",
+  "description": "A repo-local, git-versioned project brain for cross-tool AI handoffs.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "parallax": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm run format:check && pnpm run typecheck && pnpm test && pnpm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "prettier": "^3.9.5",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "openai": "^6.47.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  }
+}
