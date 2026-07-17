@@ -5,7 +5,7 @@ import {
   buildDistillationInput,
   MAX_DIGEST_CHARACTERS,
   MAX_TRANSCRIPT_CHARACTERS,
-} from "../../src/importer/openai-distiller.js";
+} from "../../src/importer/distillation-prompt.js";
 
 const digest = StoreDigestSchema.parse({
   activeDecisions: [],

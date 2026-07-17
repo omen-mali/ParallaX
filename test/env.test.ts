@@ -11,7 +11,7 @@ import {
   createEnvFromTemplate,
   envPath,
   loadProjectEnv,
-  upsertOpenAiApiKey,
+  upsertEnvVariable,
   writeApiKeyToEnv,
 } from "../src/env.js";
 
@@ -78,6 +78,7 @@ describe("writeApiKeyToEnv", () => {
 
     const result = await writeApiKeyToEnv({
       projectRoot: root,
+      apiKeyEnv: "OPENAI_API_KEY",
       readSecret: async () => secret,
     });
 
@@ -89,7 +90,7 @@ describe("writeApiKeyToEnv", () => {
 
     const contents = await readFile(envPath(root), "utf8");
     expect(contents).toContain(`OPENAI_API_KEY=${secret}`);
-    expect(contents).toContain("# Optional model override.");
+    expect(contents).toContain("# Optional provider and model overrides.");
 
     if (process.platform !== "win32") {
       const mode = (await stat(envPath(root))).mode & 0o777;
@@ -107,6 +108,7 @@ describe("writeApiKeyToEnv", () => {
 
     const declined = await writeApiKeyToEnv({
       projectRoot: root,
+      apiKeyEnv: "OPENAI_API_KEY",
       confirm: async () => false,
       readSecret: async () => "should-not-write",
     });
@@ -115,6 +117,7 @@ describe("writeApiKeyToEnv", () => {
 
     const updated = await writeApiKeyToEnv({
       projectRoot: root,
+      apiKeyEnv: "OPENAI_API_KEY",
       confirm: async () => true,
       readSecret: async () => "sk-new",
     });
@@ -130,6 +133,27 @@ describe("writeApiKeyToEnv", () => {
     }
   });
 
+  it("updates only the selected provider variable", async () => {
+    const root = await tempRoot();
+    const path = envPath(root);
+    await writeFile(
+      path,
+      "OPENAI_API_KEY=keep-openai\nGEMINI_API_KEY=old-gemini\n",
+      "utf8",
+    );
+
+    await writeApiKeyToEnv({
+      projectRoot: root,
+      apiKeyEnv: "GEMINI_API_KEY",
+      confirm: async () => true,
+      readSecret: async () => "new-gemini",
+    });
+
+    await expect(readFile(path, "utf8")).resolves.toBe(
+      "OPENAI_API_KEY=keep-openai\nGEMINI_API_KEY=new-gemini\n",
+    );
+  });
+
   it("fails clearly when no TTY is available", async () => {
     const root = await tempRoot();
     const stdin = new Readable({ read() {} }) as NodeJS.ReadStream;
@@ -142,9 +166,14 @@ describe("writeApiKeyToEnv", () => {
     Object.defineProperty(stdout, "isTTY", { value: false });
 
     await expect(
-      writeApiKeyToEnv({ projectRoot: root, stdin, stdout }),
+      writeApiKeyToEnv({
+        projectRoot: root,
+        apiKeyEnv: "GEMINI_API_KEY",
+        stdin,
+        stdout,
+      }),
     ).rejects.toThrow(
-      /TTY is required.*Set OPENAI_API_KEY in the environment or create \.env manually/,
+      /TTY is required.*Set the provider API key in the environment or create \.env manually/,
     );
   });
 
@@ -154,6 +183,7 @@ describe("writeApiKeyToEnv", () => {
     await expect(
       writeApiKeyToEnv({
         projectRoot: root,
+        apiKeyEnv: "OPENAI_API_KEY",
         readSecret: async () => "   ",
       }),
     ).rejects.toThrow("API key cannot be empty.");
@@ -192,25 +222,26 @@ describe("assertApiKeyNotPassedOnCli", () => {
   });
 });
 
-describe("upsertOpenAiApiKey", () => {
+describe("upsertEnvVariable", () => {
   it("replaces or appends without exposing the key in structure", () => {
-    expect(upsertOpenAiApiKey(ENV_EXAMPLE_CONTENTS, "sk-a")).toContain(
+    expect(upsertEnvVariable(ENV_EXAMPLE_CONTENTS, "OPENAI_API_KEY", "sk-a")).toContain(
       "OPENAI_API_KEY=sk-a",
     );
-    expect(upsertOpenAiApiKey("# only\n", "sk-b")).toBe(
-      "# only\nOPENAI_API_KEY=sk-b\n",
+    expect(upsertEnvVariable("# only\n", "GEMINI_API_KEY", "gemini-b")).toBe(
+      "# only\nGEMINI_API_KEY=gemini-b\n",
     );
   });
 
   it("replaces spaced and exported assignments instead of appending", () => {
-    expect(upsertOpenAiApiKey("OPENAI_API_KEY = old\n# keep\n", "sk-new")).toBe(
-      "OPENAI_API_KEY=sk-new\n# keep\n",
-    );
-    expect(upsertOpenAiApiKey("export OPENAI_API_KEY=old\n# keep\n", "sk-new")).toBe(
-      "OPENAI_API_KEY=sk-new\n# keep\n",
-    );
-    expect(upsertOpenAiApiKey("export OPENAI_API_KEY = old\n# keep\n", "sk-new")).toBe(
-      "OPENAI_API_KEY=sk-new\n# keep\n",
-    );
+    expect(
+      upsertEnvVariable("OPENAI_API_KEY = old\n# keep\n", "OPENAI_API_KEY", "sk-new"),
+    ).toBe("OPENAI_API_KEY=sk-new\n# keep\n");
+    expect(
+      upsertEnvVariable(
+        "export GEMINI_API_KEY = old\n# keep\n",
+        "GEMINI_API_KEY",
+        "gemini-new",
+      ),
+    ).toBe("GEMINI_API_KEY=gemini-new\n# keep\n");
   });
 });
