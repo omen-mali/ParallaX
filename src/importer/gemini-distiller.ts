@@ -4,10 +4,13 @@ import type { ImportDelta, NormalizedChat, StoreDigest } from "../contract/types
 import {
   createDistillationRequest,
   parseProviderOutput,
-  providerRequestError,
   type Distiller,
   type JsonSchema,
 } from "./distiller.js";
+import {
+  mapProviderDistillationError,
+  ProviderRefusalError,
+} from "./provider-errors.js";
 
 export interface GeminiInteractionRequest {
   model: string;
@@ -31,7 +34,9 @@ const defaultClientFactory: GeminiClientFactory = (apiKey) => {
   const client = new GoogleGenAI({ apiKey, apiVersion: "v1" });
   return {
     create: async (request) => {
-      const response = await client.interactions.create(request, { maxRetries: 0 });
+      const response = await client.interactions.create(request, {
+        maxRetries: 0,
+      });
       return { outputText: response.output_text };
     },
   };
@@ -69,8 +74,12 @@ export class GeminiDistiller implements Distiller {
         },
       });
       outputText = response.outputText;
-    } catch {
-      throw providerRequestError("gemini");
+    } catch (error: unknown) {
+      throw mapProviderDistillationError("gemini", error);
+    }
+
+    if (outputText === undefined || outputText.trim().length === 0) {
+      throw new ProviderRefusalError("gemini");
     }
 
     return parseProviderOutput("gemini", outputText);

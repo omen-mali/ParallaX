@@ -9,6 +9,7 @@ import {
   DISTILLATION_INSTRUCTIONS,
 } from "./distillation-prompt.js";
 import { IMPORT_DELTA_JSON_SCHEMA, type JsonSchema } from "./distillation-schema.js";
+import { ProviderMalformedOutputError } from "./provider-errors.js";
 
 export type { JsonSchema } from "./distillation-schema.js";
 
@@ -57,12 +58,6 @@ export function parseProviderOutput(
     const candidate = typeof output === "string" ? JSON.parse(output) : output;
     return ImportDeltaSchema.parse(candidate);
   } catch {
-    throw new Error(`${provider} returned an invalid import proposal.`);
+    throw new ProviderMalformedOutputError(provider);
   }
-}
-
-export function providerRequestError(provider: LiveProviderId): Error {
-  return new Error(
-    `${provider} distillation failed. Check provider credentials, model access, and service availability.`,
-  );
 }

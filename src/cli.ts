@@ -129,7 +129,7 @@ async function main(): Promise<void> {
       envModel: process.env.PARALLAX_MODEL,
       preset: await loadProviderPreset(storeRoot),
     });
-    const distiller = createDistiller(providerConfig.provider);
+    const distiller = await createDistiller(providerConfig.provider);
     const candidate = await distiller.distill(parsed.chat, digest, {
       model: providerConfig.model,
       apiKey: resolveProviderApiKey(providerConfig, process.env),

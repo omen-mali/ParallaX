@@ -108,6 +108,29 @@ Use `--model <name>` or `PARALLAX_MODEL` to override the provider default.
 `PARALLAX_PROVIDER` can select a provider without a CLI flag. Mock remains the
 only guaranteed zero-cost path; no live provider is assumed to be free.
 
+### Provider capabilities
+
+| Provider | Protocol                | Structured output               | Storage        | Cost                                |
+| -------- | ----------------------- | ------------------------------- | -------------- | ----------------------------------- |
+| `mock`   | Deterministic markers   | N/A (local)                     | N/A            | Always free                         |
+| `openai` | OpenAI Responses API    | Portable JSON Schema (`strict`) | `store: false` | Paid; not used in CI                |
+| `gemini` | Gemini Interactions API | Portable JSON Schema subset     | `store: false` | Free-tier may apply; not used in CI |
+
+The model-facing schema is a lowest-common-denominator JSON Schema: Gemini-
+unsupported keywords such as `minLength` and `pattern` are stripped before the
+request. `ImportDeltaSchema` remains the authoritative local validator, so empty
+strings and invalid IDs/tags are still rejected after the provider responds.
+
+Live provider failures are mapped to sanitized error categories without
+attaching SDK causes, API keys, prompts, transcripts, or raw response bodies:
+
+- `provider_auth`
+- `provider_model_unavailable`
+- `provider_rate_limit`
+- `provider_refusal`
+- `provider_malformed_output`
+- `provider_unavailable`
+
 An optional ignored preset can live at
 `<store>/.local/providers.yaml`. It contains environment variable names, never
 key values:
@@ -120,6 +143,21 @@ apiKeyEnv: GEMINI_API_KEY
 
 Configuration precedence is CLI, environment, local preset, then safe mock
 defaults. ParallaX never infers a provider from whichever API key is present.
+Selecting `mock` never loads OpenAI or Gemini SDK clients.
+
+### Gated Gemini live smoke
+
+`pnpm test` and `pnpm run check` stay offline and never call live providers.
+For one explicitly gated Gemini smoke request (preview + apply in a temporary
+store):
+
+```sh
+PARALLAX_GEMINI_LIVE_SMOKE=1 GEMINI_API_KEY=... pnpm run smoke:gemini
+```
+
+Optional: `PARALLAX_MODEL=<model>` to control free-tier model availability.
+The harness loads the repo `.env` without printing values, refuses to start
+without both the gate flag and `GEMINI_API_KEY`, and is excluded from normal CI.
 
 `compile` writes concise, approved context into safe managed blocks in
 `AGENTS.md`, `CLAUDE.md`, and `.cursor/rules/parallax.mdc`. It refuses malformed

@@ -8,9 +8,9 @@ import {
 import {
   createDistillationRequest,
   parseProviderOutput,
-  providerRequestError,
   type Distiller,
 } from "./distiller.js";
+import { mapProviderDistillationError } from "./provider-errors.js";
 import { DEFAULT_MODELS } from "./provider-config.js";
 
 export const DEFAULT_MODEL = DEFAULT_MODELS.openai;
@@ -79,8 +79,8 @@ export class OpenAIDistiller implements Distiller {
           },
         },
       });
-    } catch {
-      throw providerRequestError("openai");
+    } catch (error: unknown) {
+      throw mapProviderDistillationError("openai", error);
     }
 
     return parseProviderOutput("openai", response.output_text);
