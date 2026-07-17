@@ -5,6 +5,13 @@ import { resolve } from "node:path";
 
 import { packageName } from "./index.js";
 import { compileContext, type CompileTarget } from "./compiler/compiler.js";
+import {
+  assertApiKeyNotPassedOnCli,
+  createEnvFromTemplate,
+  envFileExists,
+  loadProjectEnv,
+  writeApiKeyToEnv,
+} from "./env.js";
 import { parseGenericMarkdown } from "./importer/generic.js";
 import { distillWithMock } from "./importer/mock-distiller.js";
 import { distillWithOpenAI } from "./importer/openai-distiller.js";
@@ -26,6 +33,8 @@ Usage:
 
 Commands:
   init       Create a .parallax project brain
+             --env       Create .env from the template if absent
+             --api-key   Prompt securely for OPENAI_API_KEY
   import     Distill a chat export into a reviewable proposal
   compile    Render approved context for AI tools
   serve      Expose approved context over MCP
@@ -45,9 +54,37 @@ async function main(): Promise<void> {
   }
 
   const projectRoot = resolve(optionValue(args, "--root") ?? process.cwd());
+  loadProjectEnv(projectRoot);
+
   if (command === "init") {
+    assertApiKeyNotPassedOnCli(args);
     const paths = await initializeStore(projectRoot);
     process.stdout.write(`Initialized ${paths.root}\n`);
+
+    const envExistedBefore = await envFileExists(projectRoot);
+
+    if (args.includes("--env")) {
+      const result = await createEnvFromTemplate(projectRoot);
+      if (result.created) {
+        process.stdout.write(`Created ${result.path}\n`);
+      } else {
+        process.stdout.write(`${result.path} already exists; leaving it unchanged.\n`);
+      }
+    }
+
+    if (args.includes("--api-key")) {
+      const result = await writeApiKeyToEnv({
+        projectRoot,
+        // Skip overwrite confirmation when this invocation created .env
+        // (for example `init --env --api-key`).
+        confirm: envExistedBefore ? undefined : async () => true,
+      });
+      if (result.written) {
+        process.stdout.write(`Wrote OPENAI_API_KEY to ${result.path}\n`);
+      } else {
+        process.stdout.write(`Left ${result.path} unchanged.\n`);
+      }
+    }
     return;
   }
 

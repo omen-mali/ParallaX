@@ -6,6 +6,8 @@ test-results/
 *.tsbuildinfo
 .parallax/
 .DS_Store
+AGENTS.md
+message.txt
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
