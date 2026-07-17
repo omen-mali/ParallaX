@@ -13,9 +13,14 @@ import {
   loadProjectEnv,
   writeApiKeyToEnv,
 } from "./env.js";
+import { createDistiller } from "./importer/distillers.js";
 import { parseGenericMarkdown } from "./importer/generic.js";
-import { distillWithMock } from "./importer/mock-distiller.js";
-import { distillWithOpenAI } from "./importer/openai-distiller.js";
+import {
+  apiKeyEnvForInit,
+  loadProviderPreset,
+  resolveProviderApiKey,
+  resolveProviderConfig,
+} from "./importer/provider-config.js";
 import { verifyImportDelta } from "./importer/verify.js";
 import { serveMcp } from "./mcp/server.js";
 import {
@@ -36,8 +41,10 @@ Usage:
 Commands:
   init       Create a .parallax project brain
              --env       Create .env from the template if absent
-             --api-key   Prompt securely for OPENAI_API_KEY
+             --provider  Select openai or gemini for --api-key
+             --api-key   Prompt securely for the selected provider key
   import     Distill a chat export into a reviewable proposal
+             --provider  Select mock, openai, or gemini (default: mock)
              --metadata-only  Do not retain normalized transcript text
   compile    Render approved context for AI tools
   serve      Expose approved context over MCP
@@ -64,6 +71,10 @@ async function main(): Promise<void> {
 
   if (command === "init") {
     assertApiKeyNotPassedOnCli(args);
+    const apiKeyEnv = args.includes("--api-key")
+      ? apiKeyEnvForInit(optionValue(args, "--provider"))
+      : undefined;
+
     const paths = await initializeStore(storeRoot);
     process.stdout.write(`Initialized ${paths.root}\n`);
 
@@ -78,15 +89,16 @@ async function main(): Promise<void> {
       }
     }
 
-    if (args.includes("--api-key")) {
+    if (apiKeyEnv !== undefined) {
       const result = await writeApiKeyToEnv({
         projectRoot,
+        apiKeyEnv,
         // Skip overwrite confirmation when this invocation created .env
         // (for example `init --env --api-key`).
         confirm: envExistedBefore ? undefined : async () => true,
       });
       if (result.written) {
-        process.stdout.write(`Wrote OPENAI_API_KEY to ${result.path}\n`);
+        process.stdout.write(`Wrote ${apiKeyEnv} to ${result.path}\n`);
       } else {
         process.stdout.write(`Left ${result.path} unchanged.\n`);
       }
@@ -97,7 +109,9 @@ async function main(): Promise<void> {
   if (command === "import") {
     const file = positionalArguments(args)[0];
     if (file === undefined) {
-      throw new Error("Usage: parallax import <chat-export> [--apply] [--mock]");
+      throw new Error(
+        "Usage: parallax import <chat-export> [--apply] [--provider mock|openai|gemini]",
+      );
     }
     const rawContents = await readFile(resolve(file), "utf8");
     const parsed = parseGenericMarkdown(rawContents, file);
@@ -106,12 +120,20 @@ async function main(): Promise<void> {
     }
 
     const digest = toStoreDigest(await readStore(storeRoot));
-    const mockMode = process.env.PARALLAX_MOCK === "1" || args.includes("--mock");
-    const candidate = mockMode
-      ? distillWithMock(parsed.chat)
-      : await distillWithOpenAI(parsed.chat, digest, {
-          model: optionValue(args, "--model"),
-        });
+    const providerConfig = resolveProviderConfig({
+      cliProvider: optionValue(args, "--provider"),
+      cliMock: args.includes("--mock"),
+      cliModel: optionValue(args, "--model"),
+      envProvider: process.env.PARALLAX_PROVIDER,
+      envMock: process.env.PARALLAX_MOCK,
+      envModel: process.env.PARALLAX_MODEL,
+      preset: await loadProviderPreset(storeRoot),
+    });
+    const distiller = createDistiller(providerConfig.provider);
+    const candidate = await distiller.distill(parsed.chat, digest, {
+      model: providerConfig.model,
+      apiKey: resolveProviderApiKey(providerConfig, process.env),
+    });
     const verified = verifyImportDelta(candidate, parsed.chat, digest);
     process.stdout.write(formatProposal(parsed.chat, verified));
 

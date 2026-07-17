@@ -30,27 +30,32 @@ pnpm run dev -- init
 ```
 
 `init` creates the durable `.parallax/` store. Commit this plain-file,
-human-editable project brain to Git. For live imports, add a local `.env`
-(gitignored) from the tracked template, or prompt for a key on a TTY:
+human-editable project brain to Git. Mock is the safe default and requires no
+API key. For live imports, add a local `.env` (gitignored) from the tracked
+template, or select a provider and prompt for its key on a TTY:
 
 ```sh
 pnpm run dev -- init --env
-pnpm run dev -- init --api-key
+pnpm run dev -- init --provider openai --api-key
+pnpm run dev -- init --provider gemini --api-key
 ```
 
 `--env` creates `.env` from `.env.example` only when it is absent.
-`--api-key` never accepts the key on the command line; it prompts securely,
-writes `OPENAI_API_KEY`, and sets owner-only permissions where supported.
+`--api-key` requires an explicit live provider and never accepts the key on the
+command line. It prompts securely, writes only `OPENAI_API_KEY` or
+`GEMINI_API_KEY`, and sets owner-only permissions where supported.
 Existing shell environment variables always take precedence over `.env`.
-Mock mode needs no key.
 
 ## Commands
 
 ```text
 parallax init
 parallax init --env
-parallax init --api-key
+parallax init --provider openai --api-key
+parallax init --provider gemini --api-key
 parallax import <chat-export>
+parallax import <chat-export> --provider openai
+parallax import <chat-export> --provider gemini
 parallax compile
 parallax serve
 parallax web
@@ -72,9 +77,10 @@ source transcript by default. For sensitive material, use `--metadata-only` to
 store source metadata without transcript text, or use an ignored local store.
 ParallaX never silently changes the retention choice.
 
-The live importer uses GPT-5.6 through the Responses API and validates its
-structured proposal with Zod. A deterministic mock mode extracts only explicit,
-line-level markers and therefore needs no API key:
+The importer supports deterministic mock extraction, OpenAI Responses, and
+Gemini Interactions. Every provider is constrained by a portable JSON Schema,
+validated again locally with Zod, and then checked against exact transcript
+quotes. Mock extracts only explicit line-level markers:
 
 ```md
 ## User
@@ -91,9 +97,29 @@ PARALLAX_MOCK=1 pnpm run dev -- import chat.md
 PARALLAX_MOCK=1 pnpm run dev -- import chat.md --apply
 ```
 
-For a live import, ensure `OPENAI_API_KEY` is set (via the environment or
-`.env`) and run `pnpm run dev -- import chat.md`. Use `--model <name>` or
-`PARALLAX_MODEL` to override the default model.
+For a live import, set the matching key and select the provider explicitly:
+
+```sh
+pnpm run dev -- import chat.md --provider openai
+pnpm run dev -- import chat.md --provider gemini
+```
+
+Use `--model <name>` or `PARALLAX_MODEL` to override the provider default.
+`PARALLAX_PROVIDER` can select a provider without a CLI flag. Mock remains the
+only guaranteed zero-cost path; no live provider is assumed to be free.
+
+An optional ignored preset can live at
+`<store>/.local/providers.yaml`. It contains environment variable names, never
+key values:
+
+```yaml
+provider: gemini
+model: gemini-3.5-flash
+apiKeyEnv: GEMINI_API_KEY
+```
+
+Configuration precedence is CLI, environment, local preset, then safe mock
+defaults. ParallaX never infers a provider from whichever API key is present.
 
 `compile` writes concise, approved context into safe managed blocks in
 `AGENTS.md`, `CLAUDE.md`, and `.cursor/rules/parallax.mdc`. It refuses malformed

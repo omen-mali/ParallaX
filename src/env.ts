@@ -7,14 +7,16 @@ import { stdin as defaultStdin, stdout as defaultStdout } from "node:process";
 export const ENV_FILE_NAME = ".env";
 
 /** Canonical template contents; keep in sync with the tracked `.env.example`. */
-export const ENV_EXAMPLE_CONTENTS = `# Required for live imports. Never commit a real key.
+export const ENV_EXAMPLE_CONTENTS = `# Required only for the selected live provider. Never commit real keys.
 OPENAI_API_KEY=
+GEMINI_API_KEY=
 
-# Optional model override.
-# PARALLAX_MODEL=gpt-5.6
+# Optional provider and model overrides. Mock is the safe default.
+# PARALLAX_PROVIDER=mock
+# PARALLAX_MODEL=
 `;
 
-const API_KEY_LINE = /^(?:export\s+)?OPENAI_API_KEY\s*=.*$/m;
+const ENV_VARIABLE_NAME = /^[A-Z][A-Z0-9_]*$/;
 const OWNER_ONLY_MODE = 0o600;
 
 export function envPath(projectRoot: string): string {
@@ -65,10 +67,18 @@ async function writeEnvFile(path: string, contents: string): Promise<void> {
   }
 }
 
-export function upsertOpenAiApiKey(contents: string, apiKey: string): string {
-  const line = `OPENAI_API_KEY=${apiKey}`;
-  if (API_KEY_LINE.test(contents)) {
-    return contents.replace(API_KEY_LINE, line);
+export function upsertEnvVariable(
+  contents: string,
+  variable: string,
+  value: string,
+): string {
+  if (!ENV_VARIABLE_NAME.test(variable)) {
+    throw new Error("Invalid environment variable name.");
+  }
+  const assignment = new RegExp(`^(?:export\\s+)?${variable}\\s*=.*$`, "m");
+  const line = `${variable}=${value}`;
+  if (assignment.test(contents)) {
+    return contents.replace(assignment, line);
   }
   const base =
     contents.endsWith("\n") || contents.length === 0 ? contents : `${contents}\n`;
@@ -105,7 +115,7 @@ function requireTty(
 ): void {
   if (!stdin.isTTY || !stdout.isTTY) {
     throw new Error(
-      `A TTY is required to ${action}. Set OPENAI_API_KEY in the environment or create ${ENV_FILE_NAME} manually.`,
+      `A TTY is required to ${action}. Set the provider API key in the environment or create ${ENV_FILE_NAME} manually.`,
     );
   }
 }
@@ -180,6 +190,7 @@ export async function confirmOverwrite(
 
 export interface WriteApiKeyOptions extends PromptIO {
   projectRoot: string;
+  apiKeyEnv: string;
   /** Injected for tests; defaults to a secure TTY prompt. */
   readSecret?: (prompt: string) => Promise<string>;
   /** Injected for tests; defaults to an interactive yes/no prompt. */
@@ -191,7 +202,7 @@ export type WriteApiKeyResult =
   | { written: false; path: string; reason: "declined" };
 
 /**
- * Prompt for an API key and write `OPENAI_API_KEY` to `.env`.
+ * Prompt for an API key and write the selected provider variable to `.env`.
  * Existing `.env` files require an explicit confirmation before modification.
  */
 export async function writeApiKeyToEnv(
@@ -200,12 +211,15 @@ export async function writeApiKeyToEnv(
   const path = envPath(options.projectRoot);
   const exists = await envFileExists(options.projectRoot);
   const io = { stdin: options.stdin, stdout: options.stdout };
+  if (!ENV_VARIABLE_NAME.test(options.apiKeyEnv)) {
+    throw new Error("Invalid API key environment variable.");
+  }
 
   if (exists) {
     const confirm =
       options.confirm ?? ((message: string) => confirmOverwrite(message, io));
     const approved = await confirm(
-      `${ENV_FILE_NAME} already exists. Update OPENAI_API_KEY?`,
+      `${ENV_FILE_NAME} already exists. Update ${options.apiKeyEnv}?`,
     );
     if (!approved) {
       return { written: false, path, reason: "declined" };
@@ -214,13 +228,13 @@ export async function writeApiKeyToEnv(
 
   const readSecret =
     options.readSecret ?? ((prompt: string) => promptSecret(prompt, io));
-  const apiKey = (await readSecret("OPENAI_API_KEY: ")).trim();
+  const apiKey = (await readSecret(`${options.apiKeyEnv}: `)).trim();
   if (apiKey.length === 0) {
     throw new Error("API key cannot be empty.");
   }
 
   const previous = exists ? await readFile(path, "utf8") : ENV_EXAMPLE_CONTENTS;
-  const next = upsertOpenAiApiKey(previous, apiKey);
+  const next = upsertEnvVariable(previous, options.apiKeyEnv, apiKey);
   await writeEnvFile(path, next);
 
   return { written: true, path, created: !exists };

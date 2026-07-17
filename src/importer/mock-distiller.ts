@@ -2,7 +2,9 @@ import type {
   EvidenceCandidate,
   ImportDelta,
   NormalizedChat,
+  StoreDigest,
 } from "../contract/types.js";
+import type { Distiller, DistillOptions } from "./distiller.js";
 
 const markerPattern = /^(Decision|Task|Question|Term):\s*(.+)$/gim;
 
@@ -72,4 +74,16 @@ export function distillWithMock(chat: NormalizedChat): ImportDelta {
   }
 
   return delta;
+}
+
+export class MockDistiller implements Distiller {
+  readonly provider = "mock" as const;
+
+  async distill(
+    chat: NormalizedChat,
+    _digest: StoreDigest,
+    _options: DistillOptions,
+  ): Promise<ImportDelta> {
+    return distillWithMock(chat);
+  }
 }
