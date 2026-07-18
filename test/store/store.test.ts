@@ -101,6 +101,118 @@ describe("custom stores", () => {
     );
   });
 
+  it("uses a validated fixed timestamp and full provenance for imported records", async () => {
+    const projectRoot = await tempRoot();
+    const storeRoot = resolveStoreRoot(projectRoot);
+    const parsed = parseGenericMarkdown(
+      `# Fixed import
+
+## User
+
+Decision: Keep reproducible fixture timestamps
+Task: Build the deterministic demo
+Question: Should generated pages commit their output?
+Term: provenance - verified source evidence
+Spec: revise | Import workflow | Preserve verified evidence in every record.`,
+      "fixed-import.md",
+    );
+    const delta = verifyImportDelta(
+      distillWithMock(parsed.chat),
+      parsed.chat,
+      emptyDigest,
+    );
+    const appliedAt = "2026-07-18T12:34:56.000Z";
+
+    await applyImport({
+      storeRoot,
+      chat: parsed.chat,
+      rawHash: parsed.rawHash,
+      delta,
+      metadataOnly: false,
+      appliedAt,
+    });
+
+    const snapshot = await readStore(storeRoot);
+    expect(snapshot.sources[0]?.importedAt).toBe(appliedAt);
+    expect(snapshot.decisions[0]).toMatchObject({
+      createdAt: appliedAt,
+      updatedAt: appliedAt,
+      evidence: {
+        sourceId: parsed.chat.id,
+        turnIndex: 0,
+        role: "user",
+      },
+    });
+    expect(snapshot.tasks[0]).toMatchObject({
+      createdAt: appliedAt,
+      updatedAt: appliedAt,
+      evidence: {
+        sourceId: parsed.chat.id,
+        turnIndex: 0,
+        role: "user",
+        quoteHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      },
+    });
+
+    for (const record of [
+      snapshot.questions[0],
+      snapshot.glossary[0],
+      snapshot.specChanges[0],
+    ]) {
+      expect(record).toMatchObject({
+        createdAt: appliedAt,
+        updatedAt: appliedAt,
+        evidence: {
+          sourceId: parsed.chat.id,
+          turnIndex: 0,
+          role: "user",
+          quoteHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
+      });
+      expect(record?.evidence.endChar).toBe(
+        record?.evidence.startChar === undefined
+          ? undefined
+          : record.evidence.startChar + record.evidence.quote.length,
+      );
+    }
+    expect(snapshot.specChanges[0]).toMatchObject({
+      section: "Import workflow",
+      operation: "revise",
+      content: "Preserve verified evidence in every record.",
+    });
+  });
+
+  it("rejects an invalid appliedAt before creating a store", async () => {
+    const projectRoot = await tempRoot();
+    const storeRoot = resolveStoreRoot(projectRoot);
+    const parsed = parseGenericMarkdown(
+      "## User\n\nDecision: Do not create a store for invalid timestamps",
+      "invalid-timestamp.md",
+    );
+    const delta = verifyImportDelta(
+      distillWithMock(parsed.chat),
+      parsed.chat,
+      emptyDigest,
+    );
+
+    await expect(
+      applyImport({
+        storeRoot,
+        chat: parsed.chat,
+        rawHash: parsed.rawHash,
+        delta,
+        metadataOnly: false,
+        appliedAt: "not-a-timestamp",
+      }),
+    ).rejects.toThrow(/appliedAt/);
+
+    await expect(
+      readFile(storePaths(storeRoot).manifest, "utf8"),
+    ).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
   it("makes transcript retention an explicit per-import choice", async () => {
     const projectRoot = await tempRoot();
     const storeRoot = resolveStoreRoot(projectRoot);

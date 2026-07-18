@@ -23,10 +23,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "demo:build": "PARALLAX_MOCK=1 tsx scripts/build-demo.ts",
+    "demo:check": "PARALLAX_MOCK=1 tsx scripts/build-demo.ts --check",
     "smoke:gemini": "tsx scripts/smoke-gemini.ts",
     "smoke:compatible": "tsx scripts/smoke-compatible.ts",
     "smoke:claude": "tsx scripts/smoke-claude.ts",
-    "check": "pnpm run format:check && pnpm run typecheck && pnpm test && pnpm run build"
+    "check": "pnpm run format:check && pnpm run typecheck && pnpm test && pnpm run build && pnpm run demo:check"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

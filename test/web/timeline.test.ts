@@ -76,10 +76,71 @@ describe("renderTimelineHtml", () => {
     );
 
     expect(html).toContain("\\u003cscript>alert(1)\\u003c/script>");
-    expect(html).toContain("No open tasks.");
+    expect(html).toContain("No tasks recorded.");
     expect(html).toContain("No questions recorded.");
     expect(html).toContain("No glossary terms recorded.");
     expect(html).toContain("No spec changes recorded.");
+  });
+
+  it("renders every decision and task status while keeping active and open counts", () => {
+    const html = renderTimelineHtml(
+      emptySnapshot({
+        decisions: [
+          {
+            id: "dec_active",
+            title: "Current decision",
+            decision: "Use the current approach.",
+            context: "Current context",
+            rationale: "Current rationale",
+            alternatives: [],
+            tags: [],
+            status: "active",
+            createdAt: "2026-07-17T00:00:00.000Z",
+            updatedAt: "2026-07-17T00:00:00.000Z",
+            evidence: { quote: "Use the current approach." },
+          },
+          {
+            id: "dec_superseded",
+            title: "Historical decision",
+            decision: "Use the earlier approach.",
+            context: "Historical context",
+            rationale: "Historical rationale",
+            alternatives: [],
+            tags: [],
+            status: "superseded",
+            createdAt: "2026-07-16T00:00:00.000Z",
+            updatedAt: "2026-07-17T00:00:00.000Z",
+            evidence: { quote: "Use the earlier approach." },
+          },
+        ],
+        tasks: [
+          {
+            id: "task_open",
+            title: "Current task",
+            status: "open",
+            evidence: { quote: "Current task" },
+          },
+          {
+            id: "task_done",
+            title: "Completed task",
+            status: "done",
+            evidence: { quote: "Completed task" },
+          },
+        ],
+      }),
+      { generatedAt: "2026-07-18T12:00:00.000Z" },
+    );
+
+    expect(html).toContain('section("decisions", "decision", "Decisions")');
+    expect(html).toContain('section("tasks", "task", "Tasks")');
+    expect(html).toContain("for (const decision of decisions)");
+    expect(html).toContain("for (const task of tasks)");
+    expect(html).toContain('"status":"superseded"');
+    expect(html).toContain('"status":"done"');
+    expect(html).toContain("article.dataset.status = statusBucket(options.status);");
+    expect(html).toContain('status === "all" || record.dataset.status === status');
+    expect(html).toContain('appendCount("Active decisions", activeDecisions.length);');
+    expect(html).toContain('appendCount("Open tasks", openTasks.length);');
   });
 
   it("preserves provenance and metadata-only notices in embedded data", () => {

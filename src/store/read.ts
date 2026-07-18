@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse } from "yaml";
@@ -11,6 +12,7 @@ import { storePaths } from "./store.js";
 
 export interface StoredEvidence {
   quote: string;
+  quoteHash?: string;
   sourceId?: string;
   turnIndex?: number;
   role?: ChatRole;
@@ -39,6 +41,7 @@ export interface StoredTask {
   status: "open" | "done";
   detail?: string;
   createdAt?: string;
+  updatedAt?: string;
   evidence: StoredEvidence;
 }
 
@@ -46,6 +49,8 @@ export interface StoredQuestion {
   id: string;
   question: string;
   status: "open" | "resolved";
+  createdAt?: string;
+  updatedAt?: string;
   evidence: StoredEvidence;
 }
 
@@ -53,6 +58,8 @@ export interface StoredGlossaryTerm {
   id: string;
   term: string;
   definition: string;
+  createdAt?: string;
+  updatedAt?: string;
   evidence: StoredEvidence;
 }
 
@@ -61,6 +68,8 @@ export interface StoredSpecChange {
   section: string;
   operation: "add" | "revise";
   content: string;
+  createdAt?: string;
+  updatedAt?: string;
   evidence: StoredEvidence;
 }
 
@@ -114,6 +123,106 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function isChatRole(value: unknown): value is ChatRole {
+  return (
+    value === "system" ||
+    value === "user" ||
+    value === "assistant" ||
+    value === "tool" ||
+    value === "unknown"
+  );
+}
+
+function quoteHash(quote: string): string {
+  return createHash("sha256").update(quote).digest("hex");
+}
+
+function legacyTaskEvidence(
+  metadata: Record<string, unknown>,
+  quote: string,
+): StoredEvidence {
+  const evidence: StoredEvidence = { quote };
+  const sourceId = optionalString(metadata.sourceId);
+  if (sourceId !== undefined) {
+    evidence.sourceId = sourceId;
+  }
+  if (typeof metadata.turnIndex === "number" && Number.isInteger(metadata.turnIndex)) {
+    evidence.turnIndex = metadata.turnIndex;
+  }
+  if (isChatRole(metadata.role)) {
+    evidence.role = metadata.role;
+  }
+  if (typeof metadata.startChar === "number" && Number.isInteger(metadata.startChar)) {
+    evidence.startChar = metadata.startChar;
+  }
+  if (typeof metadata.endChar === "number" && Number.isInteger(metadata.endChar)) {
+    evidence.endChar = metadata.endChar;
+  }
+  const storedQuoteHash = optionalString(metadata.quoteHash);
+  if (storedQuoteHash !== undefined) {
+    evidence.quoteHash = storedQuoteHash;
+  }
+  return evidence;
+}
+
+function hasModernTaskProvenance(metadata: Record<string, unknown>): boolean {
+  return ["role", "startChar", "endChar", "updatedAt"].some(
+    (field) => field in metadata,
+  );
+}
+
+function parseOwnedEvidence(
+  metadata: Record<string, unknown>,
+  quote: string,
+): StoredEvidence | undefined {
+  const provenanceFields = [
+    "sourceId",
+    "turnIndex",
+    "role",
+    "startChar",
+    "endChar",
+    "quoteHash",
+  ];
+  const hasStoredProvenance = provenanceFields.some((field) => field in metadata);
+  if (!hasStoredProvenance) {
+    return { quote };
+  }
+
+  const sourceId = optionalString(metadata.sourceId);
+  const role = metadata.role;
+  const quoteHashValue = optionalString(metadata.quoteHash);
+  if (
+    sourceId === undefined ||
+    !/^src_[a-f0-9]{64}$/.test(sourceId) ||
+    typeof metadata.turnIndex !== "number" ||
+    !Number.isInteger(metadata.turnIndex) ||
+    metadata.turnIndex < 0 ||
+    !isChatRole(role) ||
+    typeof metadata.startChar !== "number" ||
+    !Number.isInteger(metadata.startChar) ||
+    metadata.startChar < 0 ||
+    typeof metadata.endChar !== "number" ||
+    !Number.isInteger(metadata.endChar) ||
+    metadata.endChar < metadata.startChar ||
+    metadata.endChar - metadata.startChar !== quote.length ||
+    quoteHashValue === undefined ||
+    !/^[a-f0-9]{64}$/.test(quoteHashValue) ||
+    quoteHashValue !== quoteHash(quote)
+  ) {
+    return undefined;
+  }
+
+  return {
+    quote,
+    quoteHash: quoteHashValue,
+    sourceId,
+    turnIndex: metadata.turnIndex,
+    role,
+    startChar: metadata.startChar,
+    endChar: metadata.endChar,
+  };
+}
+
 function parseDecisionEvidence(value: unknown): StoredEvidence {
   if (value === null || typeof value !== "object") {
     throw new Error("Expected decision evidence object.");
@@ -129,15 +238,8 @@ function parseDecisionEvidence(value: unknown): StoredEvidence {
   if (typeof evidence.turnIndex === "number" && Number.isInteger(evidence.turnIndex)) {
     result.turnIndex = evidence.turnIndex;
   }
-  const role = optionalString(evidence.role);
-  if (
-    role === "system" ||
-    role === "user" ||
-    role === "assistant" ||
-    role === "tool" ||
-    role === "unknown"
-  ) {
-    result.role = role;
+  if (isChatRole(evidence.role)) {
+    result.role = evidence.role;
   }
   if (typeof evidence.startChar === "number" && Number.isInteger(evidence.startChar)) {
     result.startChar = evidence.startChar;
@@ -226,7 +328,8 @@ async function readDecisions(storeRoot: string): Promise<StoredDecision[]> {
 
 function extractBlockquote(body: string): string | undefined {
   const match = body.match(/^>\s?(.*)$/m);
-  return match?.[1]?.trim();
+  const quote = match?.[1];
+  return quote !== undefined && quote.trim().length > 0 ? quote : undefined;
 }
 
 function parseTaskBlock(
@@ -253,15 +356,14 @@ function parseTaskBlock(
 
     const detailMatch = remainder.match(/^\n(?:\n)?  (.+?)(?:\n\n> |\n> )/s);
     const detail = detailMatch?.[1]?.trim();
-    const evidence: StoredEvidence = { quote };
-    const sourceId = optionalString(meta.sourceId);
-    if (sourceId !== undefined) {
-      evidence.sourceId = sourceId;
-    }
-    if (typeof meta.turnIndex === "number" && Number.isInteger(meta.turnIndex)) {
-      evidence.turnIndex = meta.turnIndex;
+    const evidence = hasModernTaskProvenance(meta)
+      ? parseOwnedEvidence(meta, quote)
+      : legacyTaskEvidence(meta, quote);
+    if (evidence === undefined) {
+      return undefined;
     }
     const createdAt = optionalString(meta.createdAt);
+    const updatedAt = optionalString(meta.updatedAt);
 
     return {
       id,
@@ -269,6 +371,7 @@ function parseTaskBlock(
       status: checkbox === "x" ? "done" : "open",
       ...(detail === undefined || detail.length === 0 ? {} : { detail }),
       ...(createdAt === undefined ? {} : { createdAt }),
+      ...(updatedAt === undefined ? {} : { updatedAt }),
       evidence,
     };
   } catch {
@@ -315,33 +418,55 @@ function parseOwnedBlocks(
   contents: string,
   kind: "QUESTION" | "TERM" | "SPEC",
 ): {
-  blocks: Array<{ id: string; title: string; body: string; quote: string }>;
+  blocks: Array<{
+    id: string;
+    metadata: Record<string, unknown>;
+    title: string;
+    body: string;
+    quote: string;
+  }>;
   omitted: number;
 } {
   const pattern = new RegExp(
-    `<!-- PARALLAX:${kind}\\nid: (.+?)\\n-->\\n## (.+?)\\n\\n([\\s\\S]*?)\\n\\n> ([\\s\\S]*?)\\n<!-- PARALLAX:${kind}:END -->`,
+    `<!-- PARALLAX:${kind}\\n([\\s\\S]*?)\\n-->\\n## (.+?)\\n\\n([\\s\\S]*?)\\n\\n> ([\\s\\S]*?)\\n<!-- PARALLAX:${kind}:END -->`,
     "g",
   );
-  const blocks: Array<{ id: string; title: string; body: string; quote: string }> = [];
+  const blocks: Array<{
+    id: string;
+    metadata: Record<string, unknown>;
+    title: string;
+    body: string;
+    quote: string;
+  }> = [];
   let omitted = 0;
 
   for (const match of contents.matchAll(pattern)) {
-    const id = match[1]?.trim();
-    const title = match[2]?.trim();
-    const body = match[3]?.trim() ?? "";
-    const quote = match[4]?.trim();
-    if (
-      id === undefined ||
-      id.length === 0 ||
-      title === undefined ||
-      title.length === 0 ||
-      quote === undefined ||
-      quote.length === 0
-    ) {
+    try {
+      const parsedMetadata = parse(match[1] ?? "");
+      if (parsedMetadata === null || typeof parsedMetadata !== "object") {
+        omitted += 1;
+        continue;
+      }
+      const metadata = parsedMetadata as Record<string, unknown>;
+      const id = optionalString(metadata.id);
+      const title = match[2]?.trim();
+      const body = match[3]?.trim() ?? "";
+      const quote = match[4];
+      if (
+        id === undefined ||
+        id.length === 0 ||
+        title === undefined ||
+        title.length === 0 ||
+        quote === undefined ||
+        quote.trim().length === 0
+      ) {
+        omitted += 1;
+        continue;
+      }
+      blocks.push({ id, metadata, title, body, quote });
+    } catch {
       omitted += 1;
-      continue;
     }
-    blocks.push({ id, title, body, quote });
   }
 
   // Count obvious start markers that did not produce a valid block.
@@ -380,15 +505,20 @@ async function readQuestions(
 
   for (const block of blocks) {
     const statusMatch = block.body.match(/^Status:\s*(open|resolved)\s*$/im);
-    if (statusMatch?.[1] === undefined) {
+    const evidence = parseOwnedEvidence(block.metadata, block.quote);
+    if (statusMatch?.[1] === undefined || evidence === undefined) {
       extraOmitted += 1;
       continue;
     }
+    const createdAt = optionalString(block.metadata.createdAt);
+    const updatedAt = optionalString(block.metadata.updatedAt);
     questions.push({
       id: block.id,
       question: block.title,
       status: statusMatch[1] as "open" | "resolved",
-      evidence: { quote: block.quote },
+      ...(createdAt === undefined ? {} : { createdAt }),
+      ...(updatedAt === undefined ? {} : { updatedAt }),
+      evidence,
     });
   }
 
@@ -404,14 +534,28 @@ async function readGlossary(
   }
 
   const { blocks, omitted } = parseOwnedBlocks(contents, "TERM");
-  return {
-    glossary: blocks.map((block) => ({
+  let extraOmitted = 0;
+  const glossary: StoredGlossaryTerm[] = [];
+  for (const block of blocks) {
+    const evidence = parseOwnedEvidence(block.metadata, block.quote);
+    if (evidence === undefined) {
+      extraOmitted += 1;
+      continue;
+    }
+    const createdAt = optionalString(block.metadata.createdAt);
+    const updatedAt = optionalString(block.metadata.updatedAt);
+    glossary.push({
       id: block.id,
       term: block.title,
       definition: block.body,
-      evidence: { quote: block.quote },
-    })),
-    omitted,
+      ...(createdAt === undefined ? {} : { createdAt }),
+      ...(updatedAt === undefined ? {} : { updatedAt }),
+      evidence,
+    });
+  }
+  return {
+    glossary,
+    omitted: omitted + extraOmitted,
   };
 }
 
@@ -429,7 +573,8 @@ async function readSpecChanges(
 
   for (const block of blocks) {
     const operationMatch = block.body.match(/^Operation:\s*(add|revise)\s*$/im);
-    if (operationMatch?.[1] === undefined) {
+    const evidence = parseOwnedEvidence(block.metadata, block.quote);
+    if (operationMatch?.[1] === undefined || evidence === undefined) {
       extraOmitted += 1;
       continue;
     }
@@ -438,12 +583,16 @@ async function readSpecChanges(
       extraOmitted += 1;
       continue;
     }
+    const createdAt = optionalString(block.metadata.createdAt);
+    const updatedAt = optionalString(block.metadata.updatedAt);
     specChanges.push({
       id: block.id,
       section: block.title,
       operation: operationMatch[1] as "add" | "revise",
       content,
-      evidence: { quote: block.quote },
+      ...(createdAt === undefined ? {} : { createdAt }),
+      ...(updatedAt === undefined ? {} : { updatedAt }),
+      evidence,
     });
   }
 
