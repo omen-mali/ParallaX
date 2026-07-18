@@ -68,6 +68,7 @@ parallax init --provider gemini --api-key
 parallax init --provider openai-compatible --api-key
 parallax init --provider claude --api-key
 parallax import <chat-export>
+parallax import conversations.json --format chatgpt --conversation <id>
 parallax import <chat-export> --provider openai
 parallax import <chat-export> --provider gemini
 parallax import <chat-export> --provider openai-compatible
@@ -124,6 +125,24 @@ pnpm run dev -- import chat.md --provider gemini
 Use `--model <name>` or `PARALLAX_MODEL` to override the provider default.
 `PARALLAX_PROVIDER` can select a provider without a CLI flag. Mock remains the
 only guaranteed zero-cost path; no live provider is assumed to be free.
+
+### Chat export formats
+
+Generic Markdown is the default import format and works with transcripts that
+use role headings such as `## User` and `## Assistant`. Extracted ChatGPT
+exports are also supported without adding a ZIP dependency:
+
+```sh
+parallax import conversations.json --format chatgpt --conversation <id>
+```
+
+Pass the extracted `conversations.json` file, not the export ZIP. A
+multi-conversation export requires `--conversation <id>`; when it is omitted,
+ParallaX lists a short set of available IDs and titles without importing any
+conversation. The selected conversation follows its final parent chain,
+preserves supported text turns and roles, and ignores unsupported non-text
+content. Generic Markdown remains available as the fallback for other exports,
+including Claude-style transcripts.
 
 ### Provider capabilities
 

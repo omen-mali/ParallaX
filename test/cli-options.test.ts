@@ -11,12 +11,18 @@ describe("CLI options", () => {
       ".parallax.local",
       "--provider",
       "mock",
+      "--format",
+      "chatgpt",
+      "--conversation",
+      "conv_project_brain",
       "--model",
       "test",
       "chat.md",
     ];
 
     expect(optionValue(args, "--store")).toBe(".parallax.local");
+    expect(optionValue(args, "--format")).toBe("chatgpt");
+    expect(optionValue(args, "--conversation")).toBe("conv_project_brain");
     expect(positionalArguments(args)).toEqual(["chat.md"]);
   });
 

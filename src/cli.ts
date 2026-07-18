@@ -13,8 +13,9 @@ import {
   loadProjectEnv,
   writeApiKeyToEnv,
 } from "./env.js";
+import { parseChatGptConversations } from "./importer/chatgpt.js";
 import { createDistiller } from "./importer/distillers.js";
-import { parseGenericMarkdown } from "./importer/generic.js";
+import { parseGenericMarkdown, type ParsedChatExport } from "./importer/generic.js";
 import {
   apiKeyEnvForInit,
   loadProviderPreset,
@@ -45,6 +46,8 @@ Commands:
              --api-key   Prompt securely for the selected provider key
   import     Distill a chat export into a reviewable proposal
              --provider  Select mock, openai, gemini, openai-compatible, or claude (default: mock)
+             --format    Select generic (default) or chatgpt
+             --conversation  Required for a multi-chat ChatGPT export
              --metadata-only  Do not retain normalized transcript text
   compile    Render approved context for AI tools
   serve      Expose approved context over MCP
@@ -54,6 +57,26 @@ Store options:
   --root     Project root (default: current directory)
   --store    Store path relative to root (default: .parallax)
 `;
+
+function parseImportExport(
+  rawContents: string,
+  file: string,
+  args: string[],
+): ParsedChatExport {
+  const format = optionValue(args, "--format") ?? "generic";
+  const conversation = optionValue(args, "--conversation");
+
+  if (format === "generic") {
+    if (conversation !== undefined) {
+      throw new Error("--conversation is only valid with --format chatgpt.");
+    }
+    return parseGenericMarkdown(rawContents, file);
+  }
+  if (format === "chatgpt") {
+    return parseChatGptConversations(rawContents, file, conversation);
+  }
+  throw new Error(`Unsupported import format: ${format}. Use generic or chatgpt.`);
+}
 
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
@@ -111,11 +134,11 @@ async function main(): Promise<void> {
     const file = positionalArguments(args)[0];
     if (file === undefined) {
       throw new Error(
-        "Usage: parallax import <chat-export> [--apply] [--provider mock|openai|gemini|openai-compatible|claude]",
+        "Usage: parallax import <chat-export> [--format generic|chatgpt] [--conversation <id>] [--provider mock|openai|gemini|openai-compatible|claude] [--apply]",
       );
     }
     const rawContents = await readFile(resolve(file), "utf8");
-    const parsed = parseGenericMarkdown(rawContents, file);
+    const parsed = parseImportExport(rawContents, file, args);
     if (await sourceAlreadyImported(storeRoot, parsed.chat.id)) {
       throw new Error(`Source ${parsed.chat.id} was already imported.`);
     }
