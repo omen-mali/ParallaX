@@ -25,8 +25,8 @@ source of truth.
 ## Status
 
 The project foundation and validation contract are in place. The upcoming
-milestones add the validated import pipeline, compiler, static timeline, and
-MCP read tools.
+milestones harden the validated import pipeline, compiler, static explorer,
+and MCP read tools.
 
 ## Setup
 
@@ -243,9 +243,13 @@ Excluded from `pnpm test` and `pnpm run check`.
 `AGENTS.md`, `CLAUDE.md`, and `.cursor/rules/parallax.mdc`. It refuses malformed
 or duplicated markers and preserves every byte outside the managed block.
 
-`web` generates one self-contained `docs/index.html` that works from a local
-file or on static hosting. `serve` starts a read-only MCP stdio server with
-`get_context`, `search`, `get_decision`, and `list_tasks` tools.
+`web` generates one self-contained project-brain explorer (`docs/index.html`
+by default, overridable with `--out`) that works from a local file or on
+static hosting. It embeds a read-only snapshot of approved decisions, tasks,
+questions, glossary terms, spec changes, and stored evidence, and supports
+client-side search and filtering with no network calls. `serve`
+starts a read-only MCP stdio server with `get_context`, `search`,
+`get_decision`, and `list_tasks` tools.
 
 ## License
 

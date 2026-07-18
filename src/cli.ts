@@ -51,7 +51,8 @@ Commands:
              --metadata-only  Do not retain normalized transcript text
   compile    Render approved context for AI tools
   serve      Expose approved context over MCP
-  web        Generate a static decision timeline
+  web        Generate a static project-brain explorer
+             --out       Output HTML path (default: docs/index.html)
 
 Store options:
   --root     Project root (default: current directory)
