@@ -51,61 +51,99 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
       :root {
         color-scheme: light dark;
         font-family: ui-sans-serif, system-ui, sans-serif;
-        --bg: #f4f6f8;
-        --fg: #172033;
-        --muted: #526078;
-        --panel: #ffffff;
-        --line: #d7dee8;
-        --accent: #0f766e;
+        --bg: #0a0a0a;
+        --fg: #f4f4f5;
+        --muted: #a1a1aa;
+        --faint: #71717a;
+        --panel: #111111;
+        --inset: #0e0e10;
+        --line: #27272a;
+        --accent: #a78bfa;
+        --accent-strong: #8b5cf6;
+        --live: #34d399;
+        --live-chip-bg: rgba(52, 211, 153, 0.1);
+        --live-chip-line: rgba(52, 211, 153, 0.25);
+        --chip: rgba(255, 255, 255, 0.05);
+        --chip-accent: rgba(139, 92, 246, 0.13);
+        --chip-accent-line: rgba(167, 139, 250, 0.35);
+        --chip-accent-fg: #c4b5fd;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+        --ease: cubic-bezier(0.4, 0, 0.2, 1);
         --accent-text: #ffffff;
-        --danger: #b42318;
-        --chip: #e8eef5;
-        --focus: #155eef;
+        --btn-primary-bg: #f4f4f5;
+        --btn-primary-fg: #0a0a0a;
+        --danger: #fca5a5;
+        --danger-line: rgba(252, 165, 165, 0.4);
+        --focus: rgba(139, 92, 246, 0.55);
       }
-      @media (prefers-color-scheme: dark) {
+      @media (prefers-color-scheme: light) {
         :root {
-          --bg: #101726;
-          --fg: #e2e8f0;
-          --muted: #aab8d0;
-          --panel: #182238;
-          --line: #2a3850;
-          --accent: #2dd4bf;
-          --accent-text: #10231f;
-          --danger: #fda29b;
-          --chip: #243247;
-          --focus: #84adff;
+          --bg: #fafafa;
+          --fg: #0a0a0a;
+          --muted: #52525b;
+          --faint: #71717a;
+          --panel: #ffffff;
+          --inset: #fafafa;
+          --line: #e4e4e7;
+          --accent: #7c3aed;
+          --accent-strong: #6d28d9;
+          --live: #059669;
+          --live-chip-bg: rgba(5, 150, 105, 0.08);
+          --live-chip-line: rgba(5, 150, 105, 0.3);
+          --chip: #f4f4f5;
+          --chip-accent: rgba(124, 58, 237, 0.08);
+          --chip-accent-line: rgba(124, 58, 237, 0.25);
+          --chip-accent-fg: #6d28d9;
+          --btn-primary-bg: #18181b;
+          --btn-primary-fg: #fafafa;
+          --danger: #b42318;
+          --danger-line: rgba(180, 35, 24, 0.35);
+          --focus: rgba(124, 58, 237, 0.35);
         }
       }
       * { box-sizing: border-box; }
       body { max-width: 72rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--fg); }
-      h1 { margin: 0 0 0.4rem; font-size: 1.9rem; }
-      h2 { margin: 0; font-size: 1.25rem; }
-      h3 { margin: 0; font-size: 1.05rem; }
+      h1 { margin: 0; font-size: 1.7rem; letter-spacing: -0.02em; }
+      h2 { margin: 0; font-size: 1.15rem; }
+      h3 { margin: 0; font-size: 1rem; }
       p { line-height: 1.5; }
+      a { color: var(--accent); }
+      a:hover { color: var(--accent-strong); }
+      .kicker { margin: 0 0 0.25rem; font-family: var(--mono); font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.22em; color: var(--accent); }
+      .brand-header { display: flex; align-items: flex-start; gap: 1rem; }
+      .brand-mark { flex: none; margin-top: 0.15rem; }
+      .brand-x { color: var(--accent); }
       button, input, select, textarea { font: inherit; }
-      button, select, input, textarea { border: 1px solid var(--line); border-radius: 0.4rem; background: var(--panel); color: var(--fg); }
-      button { cursor: pointer; padding: 0.55rem 0.8rem; }
-      button:hover:not(:disabled) { border-color: var(--accent); }
+      button, select, input, textarea { border: 1px solid var(--line); border-radius: 0.5rem; background: var(--panel); color: var(--fg); }
+      button { cursor: pointer; padding: 0.55rem 0.8rem; transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease), opacity 0.2s var(--ease); }
+      button:hover:not(:disabled) { border-color: var(--accent); background: var(--chip); }
       button:disabled { cursor: not-allowed; opacity: 0.62; }
-      button.primary { border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 650; }
-      button.danger { border-color: var(--danger); color: var(--danger); }
-      input, select, textarea { width: 100%; padding: 0.55rem 0.6rem; }
-      textarea { min-height: 12rem; resize: vertical; }
-      input[type="checkbox"], input[type="radio"] { width: auto; }
+      button.primary { border-color: var(--btn-primary-bg); background: var(--btn-primary-bg); color: var(--btn-primary-fg); font-weight: 650; }
+      button.primary:hover:not(:disabled) { border-color: var(--btn-primary-bg); background: var(--btn-primary-bg); opacity: 0.9; }
+      button.primary:active:not(:disabled) { transform: scale(0.98); }
+      button.danger { border-color: var(--danger-line); color: var(--danger); }
+      button.danger:hover:not(:disabled) { border-color: var(--danger); background: var(--chip); }
+      input, select, textarea { width: 100%; padding: 0.55rem 0.6rem; background: var(--inset); }
+      textarea { min-height: 12rem; resize: vertical; font-family: var(--mono); font-size: 0.85rem; }
+      input[type="checkbox"], input[type="radio"] { width: auto; accent-color: var(--accent-strong); }
       input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
       header { margin-bottom: 1.5rem; }
       .lede, .muted, .field-note { color: var(--muted); }
-      .lede { max-width: 50rem; margin: 0; }
-      .notice { margin: 1rem 0; padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-radius: 0.45rem; background: var(--panel); line-height: 1.45; }
-      .notice.error { border-color: var(--danger); color: var(--danger); }
+      .lede { max-width: 50rem; margin: 0.35rem 0 0; }
+      .notice { margin: 1rem 0; padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-radius: 0.5rem; background: var(--panel); line-height: 1.45; }
+      .notice.error { border-color: var(--danger-line); color: var(--danger); }
       .layout { display: grid; gap: 1.25rem; }
-      .panel { padding: 1.1rem; border: 1px solid var(--line); border-radius: 0.6rem; background: var(--panel); }
+      .panel { padding: 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--panel); animation: rise 0.5s var(--ease) backwards; }
+      .layout > .panel:nth-child(2) { animation-delay: 0.06s; }
+      .layout > .panel:nth-child(3) { animation-delay: 0.12s; }
+      .layout > .panel:nth-child(4) { animation-delay: 0.18s; }
       .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.8rem; }
       .panel-header p { margin: 0.35rem 0 0; }
+      .panel-header .kicker { margin: 0 0 0.2rem; }
       .fields { display: grid; gap: 0.85rem; }
       .two-column { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
       label.field { display: grid; gap: 0.35rem; font-size: 0.9rem; }
-      fieldset { min-width: 0; margin: 0; padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.45rem; }
+      fieldset { min-width: 0; margin: 0; padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.5rem; }
       legend { padding: 0 0.3rem; font-weight: 600; }
       .inline-options { display: flex; flex-wrap: wrap; gap: 0.55rem 1rem; }
       .inline-options label, .checkbox-row { display: inline-flex; align-items: center; gap: 0.4rem; }
@@ -118,10 +156,12 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
         min-height: 2.7rem;
         padding: 0.45rem 0.7rem;
         border: 1px solid var(--line);
-        border-radius: 0.4rem;
-        background: var(--bg);
+        border-radius: 0.5rem;
+        background: var(--inset);
+        transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease);
       }
       .input-mode-options label:hover { border-color: var(--accent); }
+      .input-mode-options label:has(input:checked) { border-color: var(--chip-accent-line); background: var(--chip-accent); }
       .import-source { width: min(100%, 58rem); margin: 0 auto; }
       .import-source .field-note { text-align: center; }
       .import-settings {
@@ -131,8 +171,8 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
         align-items: start;
         padding: 1rem;
         border: 1px solid var(--line);
-        border-radius: 0.45rem;
-        background: var(--bg);
+        border-radius: 0.5rem;
+        background: var(--inset);
       }
       .import-settings .field { min-width: 0; }
       .import-settings .field-note { min-height: 2.7em; text-align: center; }
@@ -145,28 +185,40 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
       .record-group { display: grid; gap: 0.65rem; }
       .record-group h3 { margin-top: 0.35rem; }
       .cards { display: grid; gap: 0.65rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
-      article.card { padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.45rem; background: var(--bg); overflow-wrap: anywhere; }
+      article.card { padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.6rem; background: var(--inset); overflow-wrap: anywhere; transition: border-color 0.2s var(--ease); }
+      article.card:hover { border-color: var(--chip-accent-line); }
       .card-meta, .provenance, .empty { color: var(--muted); font-size: 0.85rem; }
       .card-body { margin: 0.5rem 0 0; white-space: pre-wrap; }
-      .status { display: inline-block; margin-left: 0.35rem; padding: 0.08rem 0.4rem; border-radius: 999px; background: var(--chip); font-size: 0.78rem; }
+      .status { display: inline-flex; align-items: center; gap: 0.32rem; margin-left: 0.35rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--chip); border: 1px solid var(--line); color: var(--muted); font-family: var(--mono); font-size: 0.72rem; }
+      .status::before { content: ""; width: 0.32rem; height: 0.32rem; border-radius: 50%; background: var(--faint); }
+      .status[data-status="active"], .status[data-status="open"] { background: var(--live-chip-bg); border-color: var(--live-chip-line); color: var(--live); }
+      .status[data-status="active"]::before, .status[data-status="open"]::before { background: var(--live); }
       details { margin-top: 0.65rem; }
       summary { cursor: pointer; color: var(--accent); }
       dl { display: grid; grid-template-columns: minmax(7rem, auto) 1fr; gap: 0.35rem 0.65rem; margin: 0.65rem 0 0; font-size: 0.88rem; }
-      dt { color: var(--muted); }
+      dt { color: var(--faint); }
       dd { min-width: 0; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
-      .evidence { margin-top: 0.7rem; padding: 0.65rem; border-left: 3px solid var(--accent); background: var(--panel); }
+      .evidence { margin-top: 0.7rem; padding: 0.65rem; border-left: 3px solid var(--accent-strong); background: var(--panel); border-radius: 0 0.35rem 0.35rem 0; }
       .evidence blockquote { margin: 0.35rem 0 0; white-space: pre-wrap; }
       .proposal-list { display: grid; gap: 0.65rem; margin-top: 0.8rem; }
-      .proposal-item { display: grid; gap: 0.2rem; padding: 0.7rem; border: 1px solid var(--line); border-radius: 0.4rem; }
+      .proposal-item { display: grid; gap: 0.2rem; padding: 0.7rem; border: 1px solid var(--line); border-radius: 0.5rem; background: var(--inset); transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease); }
+      .proposal-item:has(input:checked) { border-color: var(--chip-accent-line); background: var(--chip-accent); }
       .proposal-choice { display: flex; align-items: start; gap: 0.5rem; font-weight: 600; }
-      .proposal-key { display: inline-block; min-width: 2.2rem; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .proposal-key { display: inline-block; min-width: 2.2rem; color: var(--accent); font-family: var(--mono); }
       .proposal-evidence { margin: 0.25rem 0 0 1.75rem; color: var(--muted); white-space: pre-wrap; }
       .proposal-summary { margin: 0.5rem 0; white-space: pre-wrap; }
-      pre.result { max-height: 16rem; overflow: auto; padding: 0.75rem; border: 1px solid var(--line); border-radius: 0.4rem; background: var(--bg); white-space: pre-wrap; }
-      dialog { max-width: min(32rem, calc(100vw - 2rem)); border: 1px solid var(--line); border-radius: 0.65rem; color: var(--fg); background: var(--panel); box-shadow: 0 1rem 4rem rgb(0 0 0 / 30%); }
-      dialog::backdrop { background: rgb(0 0 0 / 45%); }
+      pre.result { max-height: 16rem; overflow: auto; padding: 0.75rem; border: 1px solid var(--line); border-radius: 0.5rem; background: var(--inset); white-space: pre-wrap; font-family: var(--mono); font-size: 0.85rem; }
+      dialog { max-width: min(32rem, calc(100vw - 2rem)); border: 1px solid var(--line); border-radius: 0.75rem; color: var(--fg); background: var(--panel); box-shadow: 0 1rem 4rem rgb(0 0 0 / 50%); }
+      dialog::backdrop { background: rgb(0 0 0 / 60%); }
       dialog form { display: grid; gap: 0.9rem; }
       .dialog-actions { display: flex; justify-content: end; gap: 0.6rem; }
+      .cards .empty { position: relative; padding: 1rem 5rem 1rem 1rem; background: var(--inset); border: 1px dashed var(--line); border-radius: 0.6rem; }
+      .cards .empty::after { content: ""; position: absolute; right: 0.8rem; top: 50%; width: 2.8rem; height: 2.5rem; transform: translateY(-50%) skewX(-10deg); opacity: 0.14; background: linear-gradient(#4f46e5, #4f46e5) right top / 58% 22% no-repeat, linear-gradient(#7c3aed, #7c3aed) left 55% center / 68% 22% no-repeat, linear-gradient(#8b5cf6, #8b5cf6) left bottom / 78% 22% no-repeat; }
+      @media (prefers-color-scheme: light) { .cards .empty::after { opacity: 0.1; } }
+      @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
       @media (max-width: 56rem) {
         .import-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .import-settings > :last-child { grid-column: 1 / -1; width: calc((100% - 1rem) / 2); justify-self: center; }
@@ -174,6 +226,7 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
       @media (max-width: 42rem) {
         body { padding: 1.2rem 0.85rem 3rem; }
         .panel-header { align-items: start; flex-direction: column; }
+        .brand-header { gap: 0.75rem; }
         .input-mode-options { justify-content: stretch; }
         .input-mode-options label { flex-basis: 100%; }
         .import-settings { grid-template-columns: 1fr; }
@@ -182,9 +235,24 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
     </style>
   </head>
   <body>
-    <header>
-      <h1>ParallaX local UI</h1>
-      <p class="lede">A local, loopback-only view of the approved project brain. Imports are previewed and verified before explicitly applying selected items.</p>
+    <header class="brand-header">
+      <svg class="brand-mark" width="44" height="44" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect x="2" y="2" width="60" height="60" rx="14" fill="#111111" stroke="#27272a" stroke-width="2"></rect>
+        <path d="M16 23 L26 32 L16 41" fill="none" stroke="#34d399" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M35 26 L41 32" fill="none" stroke="#b6a0fc" stroke-width="5" stroke-linecap="round"></path>
+        <path d="M47 26 L41 32" fill="none" stroke="#8b5cf6" stroke-width="5" stroke-linecap="round"></path>
+        <path d="M47 38 L41 32" fill="none" stroke="#6366f1" stroke-width="5" stroke-linecap="round"></path>
+        <path d="M35 38 L41 32" fill="none" stroke="#7c3aed" stroke-width="5" stroke-linecap="round"></path>
+        <circle cx="41" cy="32" r="6.2" fill="#8b5cf6" opacity="0.16"></circle>
+        <circle cx="41" cy="32" r="4.6" fill="#4c1d95"></circle>
+        <path d="M41 28.8 L42 31 L44.2 32 L42 33 L41 35.2 L40 33 L37.8 32 L40 31 Z" fill="#ede9fe"></path>
+        <rect x="35" y="44" width="12" height="4" rx="2" fill="#a78bfa"></rect>
+      </svg>
+      <div>
+        <p class="kicker">Local UI · Loopback-only</p>
+        <h1>Paralla<span class="brand-x">X</span></h1>
+        <p class="lede">A local, loopback-only view of the approved project brain. Imports are previewed and verified before explicitly applying selected items.</p>
+      </div>
     </header>
 
     <p id="notice" class="notice hidden" role="status" aria-live="polite"></p>
@@ -193,7 +261,8 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
       <section class="panel" aria-labelledby="snapshot-title">
         <div class="panel-header">
           <div>
-            <h2 id="snapshot-title">Approved snapshot</h2>
+            <p class="kicker">Store</p>
+            <h2 id="snapshot-title">Approved snapshot.</h2>
             <p class="muted">Reads directly from the local approved store.</p>
           </div>
           <button id="refresh-snapshot" type="button">Refresh</button>
@@ -204,7 +273,8 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
       <section class="panel" aria-labelledby="import-title">
         <div class="panel-header">
           <div>
-            <h2 id="import-title">Preview an import</h2>
+            <p class="kicker">Import</p>
+            <h2 id="import-title">Preview an import.</h2>
             <p class="muted">Content remains in this browser until you request a preview. The server keeps the verified proposal only in memory.</p>
           </div>
         </div>
@@ -270,7 +340,8 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
       <section id="proposal-panel" class="panel hidden" aria-labelledby="proposal-title">
         <div class="panel-header">
           <div>
-            <h2 id="proposal-title">Verified proposal</h2>
+            <p class="kicker">Proposal</p>
+            <h2 id="proposal-title">Verified proposal.</h2>
             <p id="proposal-summary" class="proposal-summary"></p>
           </div>
         </div>
@@ -284,7 +355,8 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
       <section class="panel" aria-labelledby="compile-title">
         <div class="panel-header">
           <div>
-            <h2 id="compile-title">Compile context</h2>
+            <p class="kicker">Compile</p>
+            <h2 id="compile-title">Compile context.</h2>
             <p class="muted">Only approved store content is compiled into selected local targets.</p>
           </div>
         </div>
@@ -513,6 +585,7 @@ export function renderUiHtml({ nonce }: UiPageOptions): string {
         if (status) {
           const chip = element("span", "status");
           chip.textContent = status;
+          chip.dataset.status = status;
           meta.append(chip);
         }
 
