@@ -48,9 +48,10 @@ describe("readStore", () => {
       rawHash: parsed.rawHash,
       delta,
       metadataOnly: false,
+      appliedAt: "2026-07-17T12:00:00.000Z",
     });
 
-    // Mock distiller does not emit spec changes; seed one owned block.
+    // Keep one legacy quote-only block readable alongside new provenance blocks.
     await appendFile(
       storePaths(storeRoot).specChanges,
       `\n<!-- PARALLAX:SPEC\nid: spec_seeded0000001\n-->\n## Compiler markers\n\nOperation: add\n\nDocument managed blocks.\n\n> Decision: Compile before MCP\n<!-- PARALLAX:SPEC:END -->\n`,
@@ -75,14 +76,34 @@ describe("readStore", () => {
     const task = snapshot.tasks[0];
     expect(task?.evidence.quote.length).toBeGreaterThan(0);
     expect(task?.evidence.sourceId).toMatch(/^src_/);
+    expect(task?.evidence.role).toBe("user");
+    expect(task?.evidence.quoteHash).toMatch(/^[a-f0-9]{64}$/);
 
-    expect(snapshot.questions[0]?.evidence.quote.length).toBeGreaterThan(0);
-    expect(snapshot.questions[0]?.evidence.sourceId).toBeUndefined();
-    expect(snapshot.glossary[0]?.term.toLowerCase()).toContain("provenance");
+    const question = snapshot.questions[0];
+    expect(question?.evidence.quote.length).toBeGreaterThan(0);
+    expect(question?.evidence).toMatchObject({
+      sourceId: parsed.chat.id,
+      turnIndex: 0,
+      role: "user",
+      quoteHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(question?.createdAt).toBe("2026-07-17T12:00:00.000Z");
+    expect(question?.updatedAt).toBe("2026-07-17T12:00:00.000Z");
+
+    const term = snapshot.glossary[0];
+    expect(term?.term.toLowerCase()).toContain("provenance");
+    expect(term?.evidence.sourceId).toBe(parsed.chat.id);
+    expect(term?.createdAt).toBe("2026-07-17T12:00:00.000Z");
+
     expect(snapshot.specChanges[0]).toMatchObject({
       section: "Compiler markers",
       operation: "add",
     });
+    expect(snapshot.specChanges[0]?.evidence).toEqual({
+      quote: "Decision: Compile before MCP",
+    });
+    expect(snapshot.specChanges[0]?.createdAt).toBeUndefined();
+    expect(snapshot.sources[0]?.importedAt).toBe("2026-07-17T12:00:00.000Z");
 
     const digest = toStoreDigest(snapshot);
     expect(digest.openQuestions.length).toBe(snapshot.questions.length);
@@ -115,6 +136,52 @@ describe("readStore", () => {
     expect(snapshot.sources).toHaveLength(1);
     expect(snapshot.sources[0]?.metadataOnly).toBe(true);
     expect(snapshot.decisions[0]?.evidence.sourceId).toBe(snapshot.sources[0]?.id);
+  });
+
+  it("preserves boundary whitespace in modern verified evidence", async () => {
+    const projectRoot = await tempRoot();
+    const storeRoot = resolveStoreRoot(projectRoot);
+    const boundaryWhitespace = "  ";
+    const parsed = parseGenericMarkdown(
+      `## User
+
+Task: Preserve task evidence${boundaryWhitespace}
+Question: Preserve question evidence${boundaryWhitespace}
+Term: provenance - Preserve glossary evidence${boundaryWhitespace}
+Spec: add | Evidence | Preserve spec evidence${boundaryWhitespace}
+Follow-up context keeps the marker lines inside the turn.`,
+      "boundary-whitespace.md",
+    );
+    const delta = verifyImportDelta(
+      distillWithMock(parsed.chat),
+      parsed.chat,
+      emptyDigest,
+    );
+
+    await applyImport({
+      storeRoot,
+      chat: parsed.chat,
+      rawHash: parsed.rawHash,
+      delta,
+      metadataOnly: false,
+      appliedAt: "2026-07-18T12:00:00.000Z",
+    });
+
+    const snapshot = await readStore(storeRoot);
+    for (const evidence of [
+      snapshot.tasks[0]?.evidence,
+      snapshot.questions[0]?.evidence,
+      snapshot.glossary[0]?.evidence,
+      snapshot.specChanges[0]?.evidence,
+    ]) {
+      expect(evidence?.quote).toMatch(/  $/);
+      expect(evidence?.quoteHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(evidence?.endChar).toBe(
+        evidence?.startChar === undefined
+          ? undefined
+          : evidence.startChar + evidence.quote.length,
+      );
+    }
   });
 
   it("skips malformed owned blocks and counts them", async () => {

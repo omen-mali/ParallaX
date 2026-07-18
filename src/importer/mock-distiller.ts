@@ -7,6 +7,7 @@ import type {
 import type { Distiller, DistillOptions } from "./distiller.js";
 
 const markerPattern = /^(Decision|Task|Question|Term):\s*(.+)$/gim;
+const specMarkerPattern = /^Spec:\s*(add|revise)\s*\|\s*(.+?)\s*\|\s*(.+)$/gim;
 
 function evidence(turnIndex: number, quote: string): EvidenceCandidate {
   return { turnIndex, quote };
@@ -18,7 +19,8 @@ function evidence(turnIndex: number, quote: string): EvidenceCandidate {
  */
 export function distillWithMock(chat: NormalizedChat): ImportDelta {
   const delta: ImportDelta = {
-    summary: "Mock proposal from explicit Decision, Task, Question, and Term markers.",
+    summary:
+      "Mock proposal from explicit Decision, Task, Question, Term, and Spec markers.",
     decisions: [],
     tasks: [],
     questions: [],
@@ -70,6 +72,31 @@ export function distillWithMock(chat: NormalizedChat): ImportDelta {
           });
         }
       }
+    }
+
+    for (const match of turn.text.matchAll(specMarkerPattern)) {
+      const operation = match[1]?.toLowerCase();
+      const section = match[2]?.trim();
+      const content = match[3]?.trim();
+      const quote = match[0];
+
+      if (
+        (operation !== "add" && operation !== "revise") ||
+        section === undefined ||
+        section.length === 0 ||
+        content === undefined ||
+        content.length === 0 ||
+        quote === undefined
+      ) {
+        continue;
+      }
+
+      delta.specChanges.push({
+        section,
+        operation,
+        content,
+        evidence: evidence(turn.index, quote),
+      });
     }
   }
 

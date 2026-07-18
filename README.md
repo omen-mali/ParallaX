@@ -108,6 +108,7 @@ Decision: Use a plain-file store
 Task: Add evidence validation
 Question: Should MCP write data?
 Term: provenance - exact supporting chat text
+Spec: revise | Demo publishing | Commit the generated static page with the fixture store
 ```
 
 ```sh
@@ -264,6 +265,27 @@ questions, glossary terms, spec changes, and stored evidence, and supports
 client-side search and filtering with no network calls. `serve`
 starts a read-only MCP stdio server with `get_context`, `search`,
 `get_decision`, and `list_tasks` tools.
+
+### Deterministic demo and GitHub Pages
+
+The tracked demo is generated only from deterministic mock fixtures and never
+needs an API key or network access:
+
+```sh
+pnpm run demo:build
+pnpm run demo:check
+```
+
+`demo:build` regenerates the owned `demo/store/` fixture store and
+`docs/index.html`. Do not hand-edit either generated output. `demo:check`
+rebuilds in a temporary location and fails if the tracked demo store or page
+has drifted from its fixtures.
+
+The Pages workflow publishes `docs/` only for pushes to `dev`. Before its first
+deployment, the repository owner must open **Settings > Pages** and choose
+**GitHub Actions** as the publishing source. The workflow uses GitHub's
+[custom Pages workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
+artifact upload and deployment steps.
 
 ## License
 
