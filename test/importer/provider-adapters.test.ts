@@ -162,4 +162,40 @@ describe("GeminiDistiller", () => {
       expect(message).not.toContain(raw);
     }
   });
+
+  it("maps transport failures to sanitized typed errors", async () => {
+    const distiller = new GeminiDistiller(() => ({
+      create: async () => {
+        throw Object.assign(new Error("secret-key Question: Which provider?"), {
+          status: 401,
+        });
+      },
+    }));
+
+    try {
+      await distiller.distill(chat, digest, {
+        model: "gemini-test",
+        apiKey: "secret-key",
+      });
+      throw new Error("Expected auth failure.");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toBe("Authentication failed for gemini.");
+      expect(message).not.toContain("secret-key");
+      expect(message).not.toContain("Question:");
+    }
+  });
+
+  it("treats empty Gemini output as a refusal", async () => {
+    const distiller = new GeminiDistiller(() => ({
+      create: async () => ({ outputText: "   " }),
+    }));
+
+    await expect(
+      distiller.distill(chat, digest, {
+        model: "gemini-test",
+        apiKey: "test-key",
+      }),
+    ).rejects.toThrow("gemini refused the request.");
+  });
 });

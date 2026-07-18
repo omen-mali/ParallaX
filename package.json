@@ -23,6 +23,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "smoke:gemini": "tsx scripts/smoke-gemini.ts",
     "check": "pnpm run format:check && pnpm run typecheck && pnpm test && pnpm run build"
   },
   "devDependencies": {
