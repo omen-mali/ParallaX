@@ -131,8 +131,10 @@ describe("renderTimelineHtml", () => {
       { generatedAt: "2026-07-18T12:00:00.000Z" },
     );
 
-    expect(html).toContain('section("decisions", "decision", "Decisions")');
-    expect(html).toContain('section("tasks", "task", "Tasks")');
+    expect(html).toContain(
+      'section("decisions", "decision", "Timeline", "Decisions.")',
+    );
+    expect(html).toContain('section("tasks", "task", "Backlog", "Tasks.")');
     expect(html).toContain("for (const decision of decisions)");
     expect(html).toContain("for (const task of tasks)");
     expect(html).toContain('"status":"superseded"');

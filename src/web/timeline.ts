@@ -30,64 +30,121 @@ export function renderTimelineHtml(
       :root {
         color-scheme: light dark;
         font-family: ui-sans-serif, system-ui, sans-serif;
-        --bg: #f4f6f8;
-        --fg: #172033;
-        --muted: #526078;
-        --panel: #ffffff;
-        --line: #d7dee8;
-        --accent: #0f766e;
-        --chip: #e8eef5;
+        --bg: #0a0a0a;
+        --fg: #f4f4f5;
+        --muted: #a1a1aa;
+        --faint: #71717a;
+        --panel: #111111;
+        --inset: #0e0e10;
+        --line: #27272a;
+        --accent: #a78bfa;
+        --accent-strong: #8b5cf6;
+        --live: #34d399;
+        --live-chip-bg: rgba(52, 211, 153, 0.1);
+        --live-chip-line: rgba(52, 211, 153, 0.25);
+        --chip: rgba(255, 255, 255, 0.05);
+        --chip-accent: rgba(139, 92, 246, 0.13);
+        --chip-accent-line: rgba(167, 139, 250, 0.35);
+        --chip-accent-fg: #c4b5fd;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+        --ease: cubic-bezier(0.4, 0, 0.2, 1);
+        --rail: rgba(139, 92, 246, 0.5);
+        --dot-done: #3f3f46;
       }
-      @media (prefers-color-scheme: dark) {
+      @media (prefers-color-scheme: light) {
         :root {
-          --bg: #101726;
-          --fg: #e2e8f0;
-          --muted: #aab8d0;
-          --panel: #182238;
-          --line: #2a3850;
-          --accent: #2dd4bf;
-          --chip: #243247;
+          --bg: #fafafa;
+          --fg: #0a0a0a;
+          --muted: #52525b;
+          --faint: #71717a;
+          --panel: #ffffff;
+          --inset: #fafafa;
+          --line: #e4e4e7;
+          --accent: #7c3aed;
+          --accent-strong: #6d28d9;
+          --live: #059669;
+          --live-chip-bg: rgba(5, 150, 105, 0.08);
+          --live-chip-line: rgba(5, 150, 105, 0.3);
+          --chip: #f4f4f5;
+          --chip-accent: rgba(124, 58, 237, 0.08);
+          --chip-accent-line: rgba(124, 58, 237, 0.25);
+          --chip-accent-fg: #6d28d9;
+          --rail: rgba(124, 58, 237, 0.45);
+          --dot-done: #d4d4d8;
         }
       }
       body { max-width: 56rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--fg); }
-      h1 { margin: 0 0 0.35rem; font-size: 1.85rem; }
-      h2 { margin: 0 0 0.75rem; font-size: 1.2rem; }
-      h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+      h1 { margin: 0; font-size: 1.7rem; letter-spacing: -0.02em; }
+      h2 { margin: 0 0 0.75rem; font-size: 1.15rem; }
+      h3 { margin: 0 0 0.35rem; font-size: 1rem; }
       p, .lede { color: var(--muted); line-height: 1.5; }
+      a { color: var(--accent); }
+      a:hover { color: var(--accent-strong); }
       header { margin-bottom: 1.5rem; }
-      .meta { font-size: 0.9rem; color: var(--muted); }
+      .kicker { margin: 0 0 0.25rem; font-family: var(--mono); font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.22em; color: var(--accent); }
+      .brand-header { display: flex; align-items: flex-start; gap: 1rem; }
+      .brand-mark { flex: none; margin-top: 0.15rem; }
+      .brand-x { color: var(--accent); }
+      .lede { margin: 0.35rem 0 0; }
+      .meta { font-size: 0.8rem; color: var(--faint); font-family: var(--mono); }
       .counts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.25rem 0; }
-      .count { background: var(--panel); border: 1px solid var(--line); border-radius: 0.4rem; padding: 0.55rem 0.75rem; font-size: 0.9rem; }
+      .count { background: var(--panel); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.55rem 0.75rem; font-size: 0.85rem; color: var(--faint); }
       .count strong { display: block; font-size: 1.15rem; color: var(--fg); }
-      .controls { display: grid; gap: 0.75rem; margin: 1rem 0 1.75rem; padding: 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 0.5rem; }
+      .controls { display: grid; gap: 0.75rem; margin: 1rem 0 1.75rem; padding: 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 0.6rem; }
       .controls label { display: grid; gap: 0.35rem; font-size: 0.85rem; color: var(--muted); }
-      .controls input, .controls select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 0.35rem; padding: 0.45rem 0.55rem; }
+      .controls input, .controls select { font: inherit; color: var(--fg); background: var(--inset); border: 1px solid var(--line); border-radius: 0.45rem; padding: 0.45rem 0.55rem; }
+      .controls input:focus-visible, .controls select:focus-visible { outline: 3px solid var(--chip-accent-line); outline-offset: 2px; }
       .filter-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
       .filter-row label { flex: 1 1 10rem; }
       section.block { margin: 2rem 0; }
-      .timeline { border-left: 2px solid var(--accent); margin: 1rem 0 0; padding-left: 1.35rem; }
-      article.record { position: relative; margin: 0 0 1rem; padding: 0.9rem 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 0.5rem; }
-      .timeline article.record::before { content: ""; position: absolute; width: 0.65rem; height: 0.65rem; left: -1.75rem; top: 1.2rem; border-radius: 50%; background: var(--accent); }
+      section.block .kicker { margin: 0 0 0.2rem; }
+      .timeline { border-left: 2px solid var(--rail); margin: 1rem 0 0; padding-left: 1.35rem; }
+      article.record { position: relative; margin: 0 0 1rem; padding: 0.9rem 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 0.6rem; animation: rise 0.45s var(--ease) backwards; transition: border-color 0.2s var(--ease); }
+      article.record:hover { border-color: var(--chip-accent-line); }
+      .timeline article.record::before { content: ""; position: absolute; width: 0.65rem; height: 0.65rem; left: -1.79rem; top: 1.2rem; border-radius: 50%; background: var(--accent-strong); box-shadow: 0 0 10px var(--rail); }
+      .timeline article.record[data-status="done"]::before, .timeline article.record[data-status="other"]::before { background: var(--dot-done); box-shadow: none; }
       .record-meta, .tags, .empty { font-size: 0.85rem; color: var(--muted); }
       .tags { display: inline; margin-left: 0.35rem; }
-      .chip { display: inline-block; background: var(--chip); border-radius: 0.25rem; padding: 0.1rem 0.4rem; margin: 0.1rem 0.2rem 0.1rem 0; font-size: 0.8rem; }
+      .chip { display: inline-block; background: var(--chip-accent); border: 1px solid var(--chip-accent-line); color: var(--chip-accent-fg); border-radius: 0.3rem; padding: 0.08rem 0.4rem; margin: 0.1rem 0.2rem 0.1rem 0; font-size: 0.74rem; font-family: var(--mono); }
       details.record-details { margin-top: 0.65rem; }
       details.record-details summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
       .detail-grid { display: grid; gap: 0.35rem; margin-top: 0.65rem; font-size: 0.9rem; }
-      .detail-grid dt { color: var(--muted); font-size: 0.8rem; }
+      .detail-grid dt { color: var(--faint); font-size: 0.8rem; }
       .detail-grid dd { margin: 0 0 0.4rem; }
-      .evidence { margin-top: 0.5rem; padding: 0.65rem 0.75rem; border-left: 3px solid var(--accent); background: var(--bg); }
-      .evidence-label { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
-      .provenance-note { font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem; }
+      .evidence { margin-top: 0.5rem; padding: 0.65rem 0.75rem; border-left: 3px solid var(--accent-strong); background: var(--inset); border-radius: 0 0.35rem 0.35rem 0; }
+      .evidence-label { font-family: var(--mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin-bottom: 0.25rem; }
+      .provenance-note { font-size: 0.78rem; color: var(--faint); margin-top: 0.35rem; font-family: var(--mono); }
       .hidden { display: none !important; }
       .list { display: grid; gap: 0.75rem; }
+      .empty { position: relative; padding: 1rem 5rem 1rem 1rem; background: var(--inset); border: 1px dashed var(--line); border-radius: 0.6rem; }
+      .empty::after { content: ""; position: absolute; right: 0.8rem; top: 50%; width: 2.8rem; height: 2.5rem; transform: translateY(-50%) skewX(-10deg); opacity: 0.14; background: linear-gradient(#4f46e5, #4f46e5) right top / 58% 22% no-repeat, linear-gradient(#7c3aed, #7c3aed) left 55% center / 68% 22% no-repeat, linear-gradient(#8b5cf6, #8b5cf6) left bottom / 78% 22% no-repeat; }
+      @media (prefers-color-scheme: light) { .empty::after { opacity: 0.1; } }
+      @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
     </style>
   </head>
   <body>
-    <header>
-      <h1>ParallaX</h1>
-      <p class="lede">Read-only explorer for the approved project brain. Generated from the selected store; nothing on this page edits the store.</p>
-      <p class="meta">Generated at <time id="generated-at"></time></p>
+    <header class="brand-header">
+      <svg class="brand-mark" width="44" height="44" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect x="2" y="2" width="60" height="60" rx="14" fill="#111111" stroke="#27272a" stroke-width="2"></rect>
+        <path d="M16 23 L26 32 L16 41" fill="none" stroke="#34d399" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M35 26 L41 32" fill="none" stroke="#b6a0fc" stroke-width="5" stroke-linecap="round"></path>
+        <path d="M47 26 L41 32" fill="none" stroke="#8b5cf6" stroke-width="5" stroke-linecap="round"></path>
+        <path d="M47 38 L41 32" fill="none" stroke="#6366f1" stroke-width="5" stroke-linecap="round"></path>
+        <path d="M35 38 L41 32" fill="none" stroke="#7c3aed" stroke-width="5" stroke-linecap="round"></path>
+        <circle cx="41" cy="32" r="6.2" fill="#8b5cf6" opacity="0.16"></circle>
+        <circle cx="41" cy="32" r="4.6" fill="#4c1d95"></circle>
+        <path d="M41 28.8 L42 31 L44.2 32 L42 33 L41 35.2 L40 33 L37.8 32 L40 31 Z" fill="#ede9fe"></path>
+        <rect x="35" y="44" width="12" height="4" rx="2" fill="#a78bfa"></rect>
+      </svg>
+      <div>
+        <p class="kicker">Project brain · Read-only</p>
+        <h1>Paralla<span class="brand-x">X</span></h1>
+        <p class="lede">Read-only explorer for the approved project brain. Generated from the selected store; nothing on this page edits the store.</p>
+        <p class="meta">Generated at <time id="generated-at"></time></p>
+      </div>
     </header>
     <div id="counts" class="counts" aria-live="polite"></div>
     <div class="controls" id="controls">
@@ -275,18 +332,21 @@ export function renderTimelineHtml(
         return article;
       }
 
-      function section(id, type, titleText) {
+      function section(id, type, kickerText, titleText) {
         const block = document.createElement("section");
         block.className = "block";
         block.id = id;
         block.dataset.type = type;
+        const kicker = document.createElement("p");
+        kicker.className = "kicker";
+        kicker.textContent = kickerText;
         const heading = document.createElement("h2");
         heading.textContent = titleText;
-        block.append(heading);
+        block.append(kicker, heading);
         return block;
       }
 
-      const decisionsSection = section("decisions", "decision", "Decisions");
+      const decisionsSection = section("decisions", "decision", "Timeline", "Decisions.");
       const timeline = document.createElement("div");
       timeline.className = "timeline";
       if (decisions.length === 0) {
@@ -322,7 +382,7 @@ export function renderTimelineHtml(
       }
       decisionsSection.append(timeline);
 
-      const tasksSection = section("tasks", "task", "Tasks");
+      const tasksSection = section("tasks", "task", "Backlog", "Tasks.");
       const taskList = document.createElement("div");
       taskList.className = "list";
       if (tasks.length === 0) {
@@ -352,7 +412,7 @@ export function renderTimelineHtml(
       }
       tasksSection.append(taskList);
 
-      const questionsSection = section("questions", "question", "Questions");
+      const questionsSection = section("questions", "question", "Open loops", "Questions.");
       const questionList = document.createElement("div");
       questionList.className = "list";
       const questions = snapshot.questions || [];
@@ -380,7 +440,7 @@ export function renderTimelineHtml(
       }
       questionsSection.append(questionList);
 
-      const glossarySection = section("glossary", "glossary", "Glossary");
+      const glossarySection = section("glossary", "glossary", "Vocabulary", "Glossary.");
       const glossaryList = document.createElement("div");
       glossaryList.className = "list";
       const glossary = snapshot.glossary || [];
@@ -407,7 +467,7 @@ export function renderTimelineHtml(
       }
       glossarySection.append(glossaryList);
 
-      const specSection = section("spec-changes", "spec", "Spec changes");
+      const specSection = section("spec-changes", "spec", "Contract", "Spec changes.");
       const specList = document.createElement("div");
       specList.className = "list";
       const specs = snapshot.specChanges || [];
