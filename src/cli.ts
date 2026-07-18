@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { renderBanner } from "./banner.js";
+import { fileURLToPath } from "node:url";
+import { colorAllowed, renderBanner } from "./banner.js";
 import { packageName, packageVersion } from "./index.js";
 import { optionValue, positionalArguments } from "./cli-options.js";
 import { compileContext, type CompileTarget } from "./compiler/compiler.js";
@@ -22,6 +24,7 @@ import {
   resolveProviderApiKey,
   resolveProviderConfig,
 } from "./importer/provider-config.js";
+import { assertReviewTty, reviewImport } from "./importer/review.js";
 import { verifyImportDelta } from "./importer/verify.js";
 import { serveMcp } from "./mcp/server.js";
 import {
@@ -49,6 +52,7 @@ Commands:
              --format    Select generic (default) or chatgpt
              --conversation  Required for a multi-chat ChatGPT export
              --metadata-only  Do not retain normalized transcript text
+             --review    Select and apply proposal items interactively (TTY only; conflicts with --apply)
   compile    Render approved context for AI tools
   serve      Expose approved context over MCP
   web        Generate a static project-brain explorer
@@ -58,6 +62,21 @@ Store options:
   --root     Project root (default: current directory)
   --store    Store path relative to root (default: .parallax)
 `;
+
+export interface CliIO {
+  stdin: NodeJS.ReadStream;
+  stdout: NodeJS.WriteStream;
+}
+
+export interface CliDependencies {
+  createDistiller?: typeof createDistiller;
+  reviewPrompt?: (question: string) => Promise<string>;
+}
+
+const defaultCliIO: CliIO = {
+  stdin: process.stdin,
+  stdout: process.stdout,
+};
 
 function parseImportExport(
   rawContents: string,
@@ -79,11 +98,34 @@ function parseImportExport(
   throw new Error(`Unsupported import format: ${format}. Use generic or chatgpt.`);
 }
 
-async function main(): Promise<void> {
-  const [command, ...args] = process.argv.slice(2);
+function selectedItemCount(delta: {
+  decisions: unknown[];
+  tasks: unknown[];
+  questions: unknown[];
+  glossary: unknown[];
+  specChanges: unknown[];
+}): number {
+  return (
+    delta.decisions.length +
+    delta.tasks.length +
+    delta.questions.length +
+    delta.glossary.length +
+    delta.specChanges.length
+  );
+}
+
+export async function runCli(
+  argv: string[] = process.argv.slice(2),
+  io: CliIO = defaultCliIO,
+  dependencies: CliDependencies = {},
+): Promise<void> {
+  const [command, ...args] = argv;
+  const { stdin, stdout } = io;
   if (command === undefined || command === "--help" || command === "-h") {
-    process.stdout.write(renderBanner({ version: packageVersion }));
-    process.stdout.write(help);
+    stdout.write(
+      renderBanner({ version: packageVersion, color: colorAllowed(stdout) }),
+    );
+    stdout.write(help);
     return;
   }
 
@@ -101,16 +143,16 @@ async function main(): Promise<void> {
       : undefined;
 
     const paths = await initializeStore(storeRoot);
-    process.stdout.write(`Initialized ${paths.root}\n`);
+    stdout.write(`Initialized ${paths.root}\n`);
 
     const envExistedBefore = await envFileExists(projectRoot);
 
     if (args.includes("--env")) {
       const result = await createEnvFromTemplate(projectRoot);
       if (result.created) {
-        process.stdout.write(`Created ${result.path}\n`);
+        stdout.write(`Created ${result.path}\n`);
       } else {
-        process.stdout.write(`${result.path} already exists; leaving it unchanged.\n`);
+        stdout.write(`${result.path} already exists; leaving it unchanged.\n`);
       }
     }
 
@@ -118,14 +160,16 @@ async function main(): Promise<void> {
       const result = await writeApiKeyToEnv({
         projectRoot,
         apiKeyEnv,
+        stdin,
+        stdout,
         // Skip overwrite confirmation when this invocation created .env
         // (for example `init --env --api-key`).
         confirm: envExistedBefore ? undefined : async () => true,
       });
       if (result.written) {
-        process.stdout.write(`Wrote ${apiKeyEnv} to ${result.path}\n`);
+        stdout.write(`Wrote ${apiKeyEnv} to ${result.path}\n`);
       } else {
-        process.stdout.write(`Left ${result.path} unchanged.\n`);
+        stdout.write(`Left ${result.path} unchanged.\n`);
       }
     }
     return;
@@ -135,9 +179,18 @@ async function main(): Promise<void> {
     const file = positionalArguments(args)[0];
     if (file === undefined) {
       throw new Error(
-        "Usage: parallax import <chat-export> [--format generic|chatgpt] [--conversation <id>] [--provider mock|openai|gemini|openai-compatible|claude] [--apply]",
+        "Usage: parallax import <chat-export> [--format generic|chatgpt] [--conversation <id>] [--provider mock|openai|gemini|openai-compatible|claude] [--apply|--review]",
       );
     }
+    const review = args.includes("--review");
+    const apply = args.includes("--apply");
+    if (review && apply) {
+      throw new Error("--review cannot be used with --apply.");
+    }
+    if (review) {
+      assertReviewTty(stdin, stdout);
+    }
+
     const rawContents = await readFile(resolve(file), "utf8");
     const parsed = parseImportExport(rawContents, file, args);
     if (await sourceAlreadyImported(storeRoot, parsed.chat.id)) {
@@ -154,16 +207,41 @@ async function main(): Promise<void> {
       envModel: process.env.PARALLAX_MODEL,
       preset: await loadProviderPreset(storeRoot),
     });
-    const distiller = await createDistiller(providerConfig.provider);
+    const distiller = await (dependencies.createDistiller ?? createDistiller)(
+      providerConfig.provider,
+    );
     const candidate = await distiller.distill(parsed.chat, digest, {
       model: providerConfig.model,
       apiKey: resolveProviderApiKey(providerConfig, process.env),
       baseUrl: providerConfig.baseUrl,
     });
     const verified = verifyImportDelta(candidate, parsed.chat, digest);
-    process.stdout.write(formatProposal(parsed.chat, verified));
 
-    if (args.includes("--apply")) {
+    if (review) {
+      const selected = await reviewImport(verified, {
+        input: stdin,
+        output: stdout,
+        prompt: dependencies.reviewPrompt,
+      });
+      if (selected === undefined) {
+        return;
+      }
+      await applyImport({
+        storeRoot,
+        chat: parsed.chat,
+        rawHash: parsed.rawHash,
+        delta: selected,
+        metadataOnly: args.includes("--metadata-only"),
+      });
+      const count = selectedItemCount(selected);
+      const suffix = count === 1 ? "item" : "items";
+      stdout.write(`Applied ${count} selected ${suffix} to ${storeRoot}\n`);
+      return;
+    }
+
+    stdout.write(formatProposal(parsed.chat, verified));
+
+    if (apply) {
       await applyImport({
         storeRoot,
         chat: parsed.chat,
@@ -171,9 +249,9 @@ async function main(): Promise<void> {
         delta: verified,
         metadataOnly: args.includes("--metadata-only"),
       });
-      process.stdout.write(`Applied proposal to ${storeRoot}\n`);
+      stdout.write(`Applied proposal to ${storeRoot}\n`);
     } else {
-      process.stdout.write("Preview only. Re-run with --apply to persist it.\n");
+      stdout.write("Preview only. Re-run with --apply to persist it.\n");
     }
     return;
   }
@@ -184,7 +262,7 @@ async function main(): Promise<void> {
       requestedTarget === undefined ? undefined : [requestedTarget as CompileTarget];
     const compiled = await compileContext(projectRoot, storeRoot, targets);
     for (const { path } of compiled) {
-      process.stdout.write(`Compiled ${path}\n`);
+      stdout.write(`Compiled ${path}\n`);
     }
     return;
   }
@@ -195,7 +273,7 @@ async function main(): Promise<void> {
       optionValue(args, "--out") ?? "docs/index.html",
     );
     await generateTimeline(storeRoot, output);
-    process.stdout.write(`Generated ${output}\n`);
+    stdout.write(`Generated ${output}\n`);
     return;
   }
 
@@ -207,8 +285,25 @@ async function main(): Promise<void> {
   throw new Error(`Unknown command: ${command}\n\n${help}`);
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`parallax: ${message}\n`);
-  process.exitCode = 1;
-});
+function isDirectCliInvocation(): boolean {
+  const entryPoint = process.argv[1];
+  if (entryPoint === undefined) {
+    return false;
+  }
+
+  try {
+    return (
+      realpathSync(resolve(entryPoint)) === realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectCliInvocation()) {
+  runCli().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`parallax: ${message}\n`);
+    process.exitCode = 1;
+  });
+}

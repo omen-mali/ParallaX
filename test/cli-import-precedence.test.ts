@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -93,6 +93,27 @@ async function prepareProject(options?: {
 }
 
 describe("CLI provider precedence (subprocess)", () => {
+  it("keeps a generic mock preview noninteractive and nonpersistent on piped stdio", async () => {
+    const root = await mkdtemp(join(tmpdir(), "parallax-cli-preview-"));
+    const chatPath = join(root, "chat.md");
+    await writeFile(chatPath, fixtureChat, "utf8");
+
+    const result = await runImport(root, [
+      "import",
+      chatPath,
+      "--root",
+      root,
+      "--mock",
+    ]);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain("Mock proposal");
+    expect(result.stdout).toContain("Preview only. Re-run with --apply to persist it.");
+    await expect(access(join(root, ".parallax"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
   it("uses --provider mock over a live env provider and live preset", async () => {
     const { root, chatPath } = await prepareProject({
       preset: "provider: openai\nmodel: gpt-test\napiKeyEnv: OPENAI_API_KEY\n",
