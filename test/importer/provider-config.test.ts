@@ -7,9 +7,31 @@ import { describe, expect, it } from "vitest";
 import {
   apiKeyEnvForInit,
   loadProviderPreset,
+  parseCompatibleBaseUrl,
   resolveProviderApiKey,
   resolveProviderConfig,
 } from "../../src/importer/provider-config.js";
+
+describe("parseCompatibleBaseUrl", () => {
+  it("accepts http and https without credentials", () => {
+    expect(parseCompatibleBaseUrl("https://api.example.com/v1")).toBe(
+      "https://api.example.com/v1",
+    );
+    expect(parseCompatibleBaseUrl("http://localhost:8080/v1")).toBe(
+      "http://localhost:8080/v1",
+    );
+  });
+
+  it("rejects other schemes and embedded credentials", () => {
+    expect(() => parseCompatibleBaseUrl("ftp://api.example.com/v1")).toThrow(
+      /http or https/,
+    );
+    expect(() =>
+      parseCompatibleBaseUrl("https://user:secret@api.example.com/v1"),
+    ).toThrow(/embedded credentials/);
+    expect(() => parseCompatibleBaseUrl("not-a-url")).toThrow(/valid http/);
+  });
+});
 
 describe("resolveProviderConfig", () => {
   it("uses mock as the safe default", () => {
@@ -128,6 +150,51 @@ describe("resolveProviderConfig", () => {
         },
       }),
     ).toThrow(/requires baseUrl in \.local\/providers\.yaml/);
+  });
+
+  it("rejects non-http(s) baseUrl and embedded credentials", async () => {
+    const storeRoot = await mkdtemp(join(tmpdir(), "parallax-provider-"));
+    await mkdir(join(storeRoot, ".local"));
+    const path = join(storeRoot, ".local", "providers.yaml");
+
+    await writeFile(
+      path,
+      [
+        "provider: openai-compatible",
+        "model: compat-model",
+        "baseUrl: ftp://api.example.com/v1",
+        "",
+      ].join("\n"),
+    );
+    await expect(loadProviderPreset(storeRoot)).rejects.toThrow(
+      /Only provider, model, apiKeyEnv, and baseUrl/,
+    );
+
+    await writeFile(
+      path,
+      [
+        "provider: openai-compatible",
+        "model: compat-model",
+        "baseUrl: https://user:pass@api.example.com/v1",
+        "",
+      ].join("\n"),
+    );
+    await expect(loadProviderPreset(storeRoot)).rejects.toThrow(
+      /Only provider, model, apiKeyEnv, and baseUrl/,
+    );
+
+    await writeFile(
+      path,
+      [
+        "provider: openai-compatible",
+        "model: compat-model",
+        "baseUrl: not-a-url",
+        "",
+      ].join("\n"),
+    );
+    await expect(loadProviderPreset(storeRoot)).rejects.toThrow(
+      /Only provider, model, apiKeyEnv, and baseUrl/,
+    );
   });
 
   it("rejects unknown and contradictory provider selections", () => {

@@ -176,6 +176,24 @@ Optional: `PARALLAX_MODEL=<model>` to control free-tier model availability.
 The harness loads the repo `.env` without printing values, refuses to start
 without both the gate flag and `GEMINI_API_KEY`, and is excluded from normal CI.
 
+### Gated OpenAI-compatible live smoke
+
+For one explicitly gated openai-compatible smoke (writes a temp
+`.local/providers.yaml` with `baseUrl` + explicit model, then one import):
+
+```sh
+PARALLAX_COMPATIBLE_LIVE_SMOKE=1 \
+  PARALLAX_COMPATIBLE_BASE_URL=https://api.example.com/v1 \
+  PARALLAX_COMPATIBLE_MODEL=some-model \
+  OPENAI_API_KEY=... \
+  pnpm run smoke:compatible
+```
+
+Optional: `PARALLAX_COMPATIBLE_API_KEY_ENV` to select a non-default key variable.
+`baseUrl` must be http(s) without embedded credentials. Transcript
+retention/storage is endpoint-defined; ParallaX makes no retention guarantee.
+Excluded from `pnpm test` and `pnpm run check`.
+
 `compile` writes concise, approved context into safe managed blocks in
 `AGENTS.md`, `CLAUDE.md`, and `.cursor/rules/parallax.mdc`. It refuses malformed
 or duplicated markers and preserves every byte outside the managed block.

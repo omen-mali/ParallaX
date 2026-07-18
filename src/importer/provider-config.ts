@@ -8,7 +8,36 @@ import type { LiveProviderId, ProviderId } from "./distiller.js";
 
 const ProviderIdSchema = z.enum(["mock", "openai", "gemini", "openai-compatible"]);
 const ApiKeyEnvSchema = z.string().regex(/^[A-Z][A-Z0-9_]*$/);
-const BaseUrlSchema = z.string().url();
+
+/**
+ * Endpoint URLs for openai-compatible: http(s) only, no embedded credentials.
+ */
+export function parseCompatibleBaseUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("baseUrl must be a valid http or https URL.");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("baseUrl must use the http or https scheme.");
+  }
+  if (url.username !== "" || url.password !== "") {
+    throw new Error("baseUrl must not include embedded credentials.");
+  }
+  return value;
+}
+
+const BaseUrlSchema = z.string().superRefine((value, context) => {
+  try {
+    parseCompatibleBaseUrl(value);
+  } catch (error: unknown) {
+    context.addIssue({
+      code: "custom",
+      message: error instanceof Error ? error.message : "Invalid baseUrl.",
+    });
+  }
+});
 
 const ProviderPresetSchema = z
   .object({
