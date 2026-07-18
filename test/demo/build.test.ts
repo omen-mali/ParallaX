@@ -75,6 +75,7 @@ describe("deterministic demo builder", () => {
       snapshot.sources.find((source) => source.metadataOnly)?.id,
     );
 
+    expect(snapshot.decisions).toHaveLength(3);
     expect(snapshot.tasks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -87,9 +88,10 @@ describe("deterministic demo builder", () => {
         }),
       ]),
     );
-    expect(snapshot.questions).toHaveLength(1);
-    expect(snapshot.glossary).toHaveLength(1);
-    expect(snapshot.specChanges).toHaveLength(1);
+    expect(snapshot.tasks).toHaveLength(3);
+    expect(snapshot.questions).toHaveLength(4);
+    expect(snapshot.glossary).toHaveLength(4);
+    expect(snapshot.specChanges).toHaveLength(4);
 
     for (const record of [
       ...snapshot.decisions,
@@ -101,10 +103,27 @@ describe("deterministic demo builder", () => {
       expectVerifiedEvidence(record.evidence);
     }
 
+    const metadataOnlySource = snapshot.sources.find((source) => source.metadataOnly);
+    expect(metadataOnlySource).toBeDefined();
+    for (const records of [
+      snapshot.decisions,
+      snapshot.tasks,
+      snapshot.questions,
+      snapshot.glossary,
+      snapshot.specChanges,
+    ]) {
+      expect(
+        records.some((record) => record.evidence.sourceId === metadataOnlySource?.id),
+      ).toBe(true);
+    }
+
     const page = await readFile(join(outputRoot, "index.html"), "utf8");
     expect(page).toContain(DEMO_GENERATED_AT);
     expect(page).toContain("Keep project notes in one Markdown file");
     expect(page).toContain("Keep sensitive imports metadata-only");
+    expect(page).toContain("Which release branch should publish the static explorer?");
+    expect(page).toContain("managed region");
+    expect(page).toContain("Retention boundary");
     expect(page).toContain("Transcript retention was disabled.");
   });
 

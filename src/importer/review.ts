@@ -1,5 +1,11 @@
 import { createInterface } from "node:readline/promises";
 
+import {
+  filterProposalSelection,
+  formatKeyedProposal,
+  parseProposalSelection,
+  proposalItems,
+} from "./proposal.js";
 import type { VerifiedImportDelta } from "./verify.js";
 
 export type ReviewInput = NodeJS.ReadableStream & { isTTY?: boolean };
@@ -13,126 +19,23 @@ export interface ReviewImportOptions {
   prompt?: ReviewPrompt;
 }
 
+/** The original TTY-review shape deliberately omits UI-only item kinds. */
 export interface ReviewItem {
   key: string;
   label: string;
   evidenceQuote: string;
 }
 
-interface ReviewCategory {
-  prefix: "d" | "t" | "q" | "g" | "s";
-  name: string;
-  items: Array<{ evidence: { quote: string } } & Record<string, unknown>>;
-  label: (item: Record<string, unknown>) => string;
-}
-
-function reviewCategories(delta: VerifiedImportDelta): ReviewCategory[] {
-  return [
-    {
-      prefix: "d",
-      name: "Decisions",
-      items: delta.decisions,
-      label: (item) => item.title as string,
-    },
-    {
-      prefix: "t",
-      name: "Tasks",
-      items: delta.tasks,
-      label: (item) => item.title as string,
-    },
-    {
-      prefix: "q",
-      name: "Questions",
-      items: delta.questions,
-      label: (item) => item.question as string,
-    },
-    {
-      prefix: "g",
-      name: "Glossary",
-      items: delta.glossary,
-      label: (item) => item.term as string,
-    },
-    {
-      prefix: "s",
-      name: "Spec changes",
-      items: delta.specChanges,
-      label: (item) => item.section as string,
-    },
-  ];
-}
-
 export function reviewItems(delta: VerifiedImportDelta): ReviewItem[] {
-  return reviewCategories(delta).flatMap(({ prefix, items, label }) =>
-    items.map((item, index) => ({
-      key: `${prefix}${index + 1}`,
-      label: label(item),
-      evidenceQuote: item.evidence.quote,
-    })),
-  );
+  return proposalItems(delta).map(({ key, label, evidenceQuote }) => ({
+    key,
+    label,
+    evidenceQuote,
+  }));
 }
-
-export function formatReviewProposal(delta: VerifiedImportDelta): string {
-  const lines = ["Review proposal", "", delta.summary];
-
-  for (const { prefix, name, items, label } of reviewCategories(delta)) {
-    lines.push("", `${name}: ${items.length}`);
-    for (const [index, item] of items.entries()) {
-      lines.push(
-        `- [${prefix}${index + 1}] ${label(item)}`,
-        `  Evidence: \u201c${item.evidence.quote}\u201d`,
-      );
-    }
-  }
-
-  return `${lines.join("\n")}\n`;
-}
-
-export function parseReviewSelection(
-  delta: VerifiedImportDelta,
-  selection: string,
-): string[] {
-  if (selection.trim() === "") {
-    return [];
-  }
-
-  const knownKeys = new Set(reviewItems(delta).map(({ key }) => key));
-  const selectedKeys: string[] = [];
-  const seenKeys = new Set<string>();
-
-  for (const rawKey of selection.split(",")) {
-    const key = rawKey.trim();
-    if (!/^[dtqgs][1-9][0-9]*$/.test(key)) {
-      throw new Error(`Invalid review selection key: ${JSON.stringify(key)}.`);
-    }
-    if (!knownKeys.has(key)) {
-      throw new Error(`Unknown review selection key: ${key}.`);
-    }
-    if (!seenKeys.has(key)) {
-      seenKeys.add(key);
-      selectedKeys.push(key);
-    }
-  }
-
-  return selectedKeys;
-}
-
-export function filterReviewSelection(
-  delta: VerifiedImportDelta,
-  selectedKeys: readonly string[],
-): VerifiedImportDelta {
-  const selected = new Set(selectedKeys);
-
-  return {
-    ...delta,
-    decisions: delta.decisions.filter((_item, index) => selected.has(`d${index + 1}`)),
-    tasks: delta.tasks.filter((_item, index) => selected.has(`t${index + 1}`)),
-    questions: delta.questions.filter((_item, index) => selected.has(`q${index + 1}`)),
-    glossary: delta.glossary.filter((_item, index) => selected.has(`g${index + 1}`)),
-    specChanges: delta.specChanges.filter((_item, index) =>
-      selected.has(`s${index + 1}`),
-    ),
-  };
-}
+export const formatReviewProposal = formatKeyedProposal;
+export const parseReviewSelection = parseProposalSelection;
+export const filterReviewSelection = filterProposalSelection;
 
 export function assertReviewTty(
   input: Pick<ReviewInput, "isTTY">,

@@ -59,9 +59,9 @@ const HISTORICAL_FIXTURE: DemoFixture = {
   expected: {
     decisions: 1,
     tasks: 1,
-    questions: 0,
-    glossary: 0,
-    specChanges: 0,
+    questions: 1,
+    glossary: 1,
+    specChanges: 1,
   },
 };
 
@@ -72,9 +72,9 @@ const CURRENT_FIXTURE: DemoFixture = {
   expected: {
     decisions: 1,
     tasks: 1,
-    questions: 1,
-    glossary: 1,
-    specChanges: 1,
+    questions: 2,
+    glossary: 2,
+    specChanges: 2,
   },
 };
 
@@ -85,9 +85,9 @@ const METADATA_ONLY_FIXTURE: DemoFixture = {
   expected: {
     decisions: 1,
     tasks: 1,
-    questions: 0,
-    glossary: 0,
-    specChanges: 0,
+    questions: 1,
+    glossary: 1,
+    specChanges: 1,
   },
 };
 
