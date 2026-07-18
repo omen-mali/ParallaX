@@ -19,6 +19,10 @@ import {
   OpenAICompatibleDistiller,
   type CompatibleChatCompletionRequest,
 } from "../../src/importer/openai-compatible-distiller.js";
+import {
+  AnthropicDistiller,
+  type ClaudeMessagesRequest,
+} from "../../src/importer/claude-distiller.js";
 
 const chat = NormalizedChatSchema.parse({
   schemaVersion: 1,
@@ -292,6 +296,85 @@ describe("OpenAICompatibleDistiller", () => {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       expect(message).toBe("openai-compatible returned an invalid import proposal.");
+      expect(message).not.toContain(raw);
+    }
+  });
+});
+
+describe("AnthropicDistiller", () => {
+  it("submits portable schema through output_config.format", async () => {
+    let captured: ClaudeMessagesRequest | undefined;
+    const distiller = new AnthropicDistiller(() => ({
+      create: async (request) => {
+        captured = request;
+        return {
+          content: [{ type: "text", text: JSON.stringify(validDelta) }],
+        };
+      },
+    }));
+
+    await expect(
+      distiller.distill(chat, digest, {
+        model: "claude-test",
+        apiKey: "test-key",
+      }),
+    ).resolves.toEqual(validDelta);
+
+    expect(captured).toMatchObject({
+      model: "claude-test",
+      max_tokens: 8192,
+      output_config: {
+        format: {
+          type: "json_schema",
+          schema: IMPORT_DELTA_JSON_SCHEMA,
+        },
+      },
+    });
+    expect(captured?.system).toContain("untrusted data");
+    expect(captured?.messages[0]?.content).toContain("[TURN 0 | ROLE user]");
+  });
+
+  it("sanitizes transport failures and refuses non-text output", async () => {
+    await expect(
+      new AnthropicDistiller(() => ({
+        create: async () => {
+          throw new Error("secret-key Question: Which provider? raw-response");
+        },
+      })).distill(chat, digest, {
+        model: "claude-test",
+        apiKey: "secret-key",
+      }),
+    ).rejects.toThrow(
+      "claude distillation failed. Check provider credentials, model access, and service availability.",
+    );
+
+    await expect(
+      new AnthropicDistiller(() => ({
+        create: async () => ({
+          content: [{ type: "tool_use" }],
+        }),
+      })).distill(chat, digest, {
+        model: "claude-test",
+        apiKey: "test-key",
+      }),
+    ).rejects.toThrow("claude refused the request.");
+  });
+
+  it("hides malformed bodies", async () => {
+    const raw = "raw-sensitive-response";
+    try {
+      await new AnthropicDistiller(() => ({
+        create: async () => ({
+          content: [{ type: "text", text: raw }],
+        }),
+      })).distill(chat, digest, {
+        model: "claude-test",
+        apiKey: "test-key",
+      });
+      throw new Error("Expected malformed output to fail.");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toBe("claude returned an invalid import proposal.");
       expect(message).not.toContain(raw);
     }
   });

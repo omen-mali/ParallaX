@@ -41,10 +41,10 @@ Usage:
 Commands:
   init       Create a .parallax project brain
              --env       Create .env from the template if absent
-             --provider  Select openai, gemini, or openai-compatible for --api-key
+             --provider  Select openai, gemini, openai-compatible, or claude for --api-key
              --api-key   Prompt securely for the selected provider key
   import     Distill a chat export into a reviewable proposal
-             --provider  Select mock, openai, gemini, or openai-compatible (default: mock)
+             --provider  Select mock, openai, gemini, openai-compatible, or claude (default: mock)
              --metadata-only  Do not retain normalized transcript text
   compile    Render approved context for AI tools
   serve      Expose approved context over MCP
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
     const file = positionalArguments(args)[0];
     if (file === undefined) {
       throw new Error(
-        "Usage: parallax import <chat-export> [--apply] [--provider mock|openai|gemini|openai-compatible]",
+        "Usage: parallax import <chat-export> [--apply] [--provider mock|openai|gemini|openai-compatible|claude]",
       );
     }
     const rawContents = await readFile(resolve(file), "utf8");
