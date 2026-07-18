@@ -2,8 +2,8 @@
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-
-import { packageName } from "./index.js";
+import { renderBanner } from "./banner.js";
+import { packageName, packageVersion } from "./index.js";
 import { optionValue, positionalArguments } from "./cli-options.js";
 import { compileContext, type CompileTarget } from "./compiler/compiler.js";
 import {
@@ -33,7 +33,7 @@ import {
 import { readStore, toStoreDigest } from "./store/read.js";
 import { generateTimeline } from "./web/timeline.js";
 
-const help = `ParallaX (${packageName})
+const help = `ParallaX is a tool for distilling and reviewing chat exports, compiling approved context for AI tools, and generating static decision timelines.
 
 Usage:
   parallax <command> [--root <path>] [--store <path>]
@@ -58,6 +58,7 @@ Store options:
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   if (command === undefined || command === "--help" || command === "-h") {
+    process.stdout.write(renderBanner({ version: packageVersion }));
     process.stdout.write(help);
     return;
   }
