@@ -1,7 +1,16 @@
-# ParallaX
+<p align="center">
+  <img src=".github/assets/readme-banner.png" alt="ParallaX — one brain, three dialects" width="880">
+</p>
 
-ParallaX is a repo-local, git-versioned project brain for handing context
-between AI tools.
+<p align="center">
+  ParallaX is a repo-local, git-versioned <strong>project brain</strong> for handing context between AI tools.
+</p>
+
+<p align="center">
+  <sub><code>MIT</code> · <code>Node ≥ 20</code> · <code>mock-first — runs with zero API keys</code></sub>
+</p>
+
+---
 
 Its V1 loop is:
 
