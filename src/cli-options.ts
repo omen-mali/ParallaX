@@ -1,4 +1,6 @@
 const VALUE_OPTIONS = new Set([
+  "--conversation",
+  "--format",
   "--model",
   "--out",
   "--provider",

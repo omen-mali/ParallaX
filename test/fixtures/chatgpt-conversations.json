@@ -1,0 +1,104 @@
+[
+  {
+    "id": "conv_project_brain",
+    "title": "Project brain plan",
+    "current_node": "final_assistant",
+    "mapping": {
+      "root": {
+        "id": "root",
+        "message": null,
+        "parent": null,
+        "children": ["system"]
+      },
+      "system": {
+        "id": "system",
+        "message": {
+          "author": { "role": "system" },
+          "content": { "content_type": "text", "parts": ["Keep provenance exact."] }
+        },
+        "parent": "root",
+        "children": ["user"]
+      },
+      "user": {
+        "id": "user",
+        "message": {
+          "author": { "role": "user" },
+          "content": {
+            "content_type": "text",
+            "parts": ["Plan the project brain.\nUse plain files."]
+          }
+        },
+        "parent": "system",
+        "children": ["obsolete_assistant", "assistant"]
+      },
+      "obsolete_assistant": {
+        "id": "obsolete_assistant",
+        "message": {
+          "author": { "role": "assistant" },
+          "content": { "content_type": "text", "parts": ["Ignore this old branch."] }
+        },
+        "parent": "user",
+        "children": []
+      },
+      "assistant": {
+        "id": "assistant",
+        "message": {
+          "author": { "role": "assistant" },
+          "content": { "content_type": "text", "parts": ["Use a reviewable proposal."] }
+        },
+        "parent": "user",
+        "children": ["tool"]
+      },
+      "tool": {
+        "id": "tool",
+        "message": {
+          "author": { "role": "tool" },
+          "content": { "content_type": "text", "parts": ["Tool result: validated"] }
+        },
+        "parent": "assistant",
+        "children": ["empty"]
+      },
+      "empty": {
+        "id": "empty",
+        "message": {
+          "author": { "role": "assistant" },
+          "content": { "content_type": "text", "parts": [] }
+        },
+        "parent": "tool",
+        "children": ["final_assistant"]
+      },
+      "final_assistant": {
+        "id": "final_assistant",
+        "message": {
+          "author": { "role": "assistant" },
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              "Decision: keep the store local.",
+              { "asset_pointer": "file-service://synthetic-image" },
+              "Task: ship the static explorer."
+            ]
+          }
+        },
+        "parent": "empty",
+        "children": []
+      }
+    }
+  },
+  {
+    "id": "conv_other",
+    "title": "Other chat",
+    "current_node": "other_user",
+    "mapping": {
+      "other_user": {
+        "id": "other_user",
+        "message": {
+          "author": { "role": "user" },
+          "content": { "content_type": "text", "parts": ["Other conversation"] }
+        },
+        "parent": null,
+        "children": []
+      }
+    }
+  }
+]
