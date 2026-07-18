@@ -5,6 +5,10 @@ import { z } from "zod";
 import { renderContext } from "../compiler/compiler.js";
 import { readStore, type StoreSnapshot } from "../store/read.js";
 
+export interface SnapshotReader {
+  readSnapshot(): Promise<StoreSnapshot>;
+}
+
 function textResult(value: unknown) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
@@ -59,15 +63,22 @@ export function searchSnapshot(snapshot: StoreSnapshot, query: string): SearchRe
     );
 }
 
-export function createMcpServer(storeRoot: string): McpServer {
+function snapshotReader(source: string | SnapshotReader): () => Promise<StoreSnapshot> {
+  return typeof source === "string"
+    ? () => readStore(source)
+    : () => source.readSnapshot();
+}
+
+export function createMcpServer(source: string | SnapshotReader): McpServer {
   const server = new McpServer({ name: "parallax", version: "0.1.0" });
+  const readSnapshot = snapshotReader(source);
 
   server.registerTool(
     "get_context",
     {
       description: "Get concise approved project context from the ParallaX store.",
     },
-    async () => textResult({ context: renderContext(await readStore(storeRoot)) }),
+    async () => textResult({ context: renderContext(await readSnapshot()) }),
   );
 
   server.registerTool(
@@ -76,7 +87,7 @@ export function createMcpServer(storeRoot: string): McpServer {
       description: "Search approved decisions and tasks with lexical scoring.",
       inputSchema: { query: z.string().min(1) },
     },
-    async ({ query }) => textResult(searchSnapshot(await readStore(storeRoot), query)),
+    async ({ query }) => textResult(searchSnapshot(await readSnapshot(), query)),
   );
 
   server.registerTool(
@@ -86,7 +97,7 @@ export function createMcpServer(storeRoot: string): McpServer {
       inputSchema: { id: z.string().min(1) },
     },
     async ({ id }) => {
-      const decision = (await readStore(storeRoot)).decisions.find(
+      const decision = (await readSnapshot()).decisions.find(
         (candidate) => candidate.id === id,
       );
       if (decision === undefined) {
@@ -106,7 +117,7 @@ export function createMcpServer(storeRoot: string): McpServer {
       inputSchema: { status: z.enum(["open", "done"]).optional() },
     },
     async ({ status }) => {
-      const tasks = (await readStore(storeRoot)).tasks.filter(
+      const tasks = (await readSnapshot()).tasks.filter(
         (task) => status === undefined || task.status === status,
       );
       return textResult(tasks);
@@ -116,7 +127,7 @@ export function createMcpServer(storeRoot: string): McpServer {
   return server;
 }
 
-export async function serveMcp(storeRoot: string): Promise<void> {
-  const server = createMcpServer(storeRoot);
+export async function serveMcp(source: string | SnapshotReader): Promise<void> {
+  const server = createMcpServer(source);
   await server.connect(new StdioServerTransport());
 }

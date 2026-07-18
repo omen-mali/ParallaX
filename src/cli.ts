@@ -4,38 +4,24 @@ import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createApplicationServices } from "./application/services.js";
 import { colorAllowed, renderBanner } from "./banner.js";
 import { packageName, packageVersion } from "./index.js";
 import { optionValue, positionalArguments } from "./cli-options.js";
-import { compileContext, type CompileTarget } from "./compiler/compiler.js";
+import type { CompileTarget } from "./compiler/compiler.js";
 import {
   assertApiKeyNotPassedOnCli,
   createEnvFromTemplate,
   envFileExists,
-  loadProjectEnv,
   writeApiKeyToEnv,
 } from "./env.js";
-import { parseChatGptConversations } from "./importer/chatgpt.js";
 import { createDistiller } from "./importer/distillers.js";
-import { parseGenericMarkdown, type ParsedChatExport } from "./importer/generic.js";
-import {
-  apiKeyEnvForInit,
-  loadProviderPreset,
-  resolveProviderApiKey,
-  resolveProviderConfig,
-} from "./importer/provider-config.js";
+import { apiKeyEnvForInit } from "./importer/provider-config.js";
 import { assertReviewTty, reviewImport } from "./importer/review.js";
-import { verifyImportDelta } from "./importer/verify.js";
 import { serveMcp } from "./mcp/server.js";
-import {
-  applyImport,
-  formatProposal,
-  initializeStore,
-  resolveStoreRoot,
-  sourceAlreadyImported,
-} from "./store/store.js";
-import { readStore, toStoreDigest } from "./store/read.js";
-import { generateTimeline } from "./web/timeline.js";
+import { formatProposal, initializeStore, resolveStoreRoot } from "./store/store.js";
+import { startUiServer } from "./ui/server.js";
+import { generateTimelineFromSnapshot } from "./web/timeline.js";
 
 const help = `ParallaX is a tool for distilling and reviewing chat exports, compiling approved context for AI tools, and generating static decision timelines.
 
@@ -57,6 +43,10 @@ Commands:
   serve      Expose approved context over MCP
   web        Generate a static project-brain explorer
              --out       Output HTML path (default: docs/index.html)
+  ui         Open a loopback-only local browser interface
+             --provider  Initial provider choice; the browser can choose provider and model per preview
+             --mock      Start with the deterministic mock provider
+             --model     Initial provider model
 
 Store options:
   --root     Project root (default: current directory)
@@ -71,6 +61,8 @@ export interface CliIO {
 export interface CliDependencies {
   createDistiller?: typeof createDistiller;
   reviewPrompt?: (question: string) => Promise<string>;
+  createApplicationServices?: typeof createApplicationServices;
+  startUiServer?: typeof startUiServer;
 }
 
 const defaultCliIO: CliIO = {
@@ -78,40 +70,12 @@ const defaultCliIO: CliIO = {
   stdout: process.stdout,
 };
 
-function parseImportExport(
-  rawContents: string,
-  file: string,
-  args: string[],
-): ParsedChatExport {
+function importFormat(args: string[]): "generic" | "chatgpt" {
   const format = optionValue(args, "--format") ?? "generic";
-  const conversation = optionValue(args, "--conversation");
-
-  if (format === "generic") {
-    if (conversation !== undefined) {
-      throw new Error("--conversation is only valid with --format chatgpt.");
-    }
-    return parseGenericMarkdown(rawContents, file);
+  if (format !== "generic" && format !== "chatgpt") {
+    throw new Error(`Unsupported import format: ${format}. Use generic or chatgpt.`);
   }
-  if (format === "chatgpt") {
-    return parseChatGptConversations(rawContents, file, conversation);
-  }
-  throw new Error(`Unsupported import format: ${format}. Use generic or chatgpt.`);
-}
-
-function selectedItemCount(delta: {
-  decisions: unknown[];
-  tasks: unknown[];
-  questions: unknown[];
-  glossary: unknown[];
-  specChanges: unknown[];
-}): number {
-  return (
-    delta.decisions.length +
-    delta.tasks.length +
-    delta.questions.length +
-    delta.glossary.length +
-    delta.specChanges.length
-  );
+  return format;
 }
 
 export async function runCli(
@@ -119,7 +83,11 @@ export async function runCli(
   io: CliIO = defaultCliIO,
   dependencies: CliDependencies = {},
 ): Promise<void> {
-  const [command, ...args] = argv;
+  // pnpm 11 forwards a separator written as `pnpm run dev -- ui` to the
+  // script. Accept it for callers accustomed to npm-style forwarding, while
+  // documentation uses the simpler `pnpm run dev ui` form.
+  const normalizedArgv = argv[0] === "--" ? argv.slice(1) : argv;
+  const [command, ...args] = normalizedArgv;
   const { stdin, stdout } = io;
   if (command === undefined || command === "--help" || command === "-h") {
     stdout.write(
@@ -130,11 +98,20 @@ export async function runCli(
   }
 
   const projectRoot = resolve(optionValue(args, "--root") ?? process.cwd());
-  const storeRoot = resolveStoreRoot(
-    projectRoot,
-    optionValue(args, "--store") ?? undefined,
-  );
-  loadProjectEnv(projectRoot);
+  const storePath = optionValue(args, "--store") ?? undefined;
+  const storeRoot = resolveStoreRoot(projectRoot, storePath);
+  const applicationServices = (
+    serviceOptions: { respectMockEnvironment?: boolean } = {},
+  ) =>
+    (dependencies.createApplicationServices ?? createApplicationServices)({
+      projectRoot,
+      storePath,
+      provider: optionValue(args, "--provider"),
+      mock: args.includes("--mock"),
+      model: optionValue(args, "--model"),
+      createDistiller: dependencies.createDistiller,
+      ...serviceOptions,
+    });
 
   if (command === "init") {
     assertApiKeyNotPassedOnCli(args);
@@ -192,33 +169,19 @@ export async function runCli(
     }
 
     const rawContents = await readFile(resolve(file), "utf8");
-    const parsed = parseImportExport(rawContents, file, args);
-    if (await sourceAlreadyImported(storeRoot, parsed.chat.id)) {
-      throw new Error(`Source ${parsed.chat.id} was already imported.`);
-    }
-
-    const digest = toStoreDigest(await readStore(storeRoot));
-    const providerConfig = resolveProviderConfig({
-      cliProvider: optionValue(args, "--provider"),
-      cliMock: args.includes("--mock"),
-      cliModel: optionValue(args, "--model"),
-      envProvider: process.env.PARALLAX_PROVIDER,
-      envMock: process.env.PARALLAX_MOCK,
-      envModel: process.env.PARALLAX_MODEL,
-      preset: await loadProviderPreset(storeRoot),
+    const services = applicationServices();
+    const prepared = await services.prepareImport({
+      contents: rawContents,
+      fileName: file,
+      format: importFormat(args),
+      conversationId: optionValue(args, "--conversation"),
+      provider: optionValue(args, "--provider"),
+      mock: args.includes("--mock"),
+      model: optionValue(args, "--model"),
     });
-    const distiller = await (dependencies.createDistiller ?? createDistiller)(
-      providerConfig.provider,
-    );
-    const candidate = await distiller.distill(parsed.chat, digest, {
-      model: providerConfig.model,
-      apiKey: resolveProviderApiKey(providerConfig, process.env),
-      baseUrl: providerConfig.baseUrl,
-    });
-    const verified = verifyImportDelta(candidate, parsed.chat, digest);
 
     if (review) {
-      const selected = await reviewImport(verified, {
+      const selected = await reviewImport(prepared.delta, {
         input: stdin,
         output: stdout,
         prompt: dependencies.reviewPrompt,
@@ -226,27 +189,20 @@ export async function runCli(
       if (selected === undefined) {
         return;
       }
-      await applyImport({
-        storeRoot,
-        chat: parsed.chat,
-        rawHash: parsed.rawHash,
-        delta: selected,
+      const applied = await services.applyPreparedImport(prepared, {
+        selectedDelta: selected,
         metadataOnly: args.includes("--metadata-only"),
       });
-      const count = selectedItemCount(selected);
+      const count = applied.appliedCount;
       const suffix = count === 1 ? "item" : "items";
       stdout.write(`Applied ${count} selected ${suffix} to ${storeRoot}\n`);
       return;
     }
 
-    stdout.write(formatProposal(parsed.chat, verified));
+    stdout.write(formatProposal(prepared.chat, prepared.delta));
 
     if (apply) {
-      await applyImport({
-        storeRoot,
-        chat: parsed.chat,
-        rawHash: parsed.rawHash,
-        delta: verified,
+      await services.applyPreparedImport(prepared, {
         metadataOnly: args.includes("--metadata-only"),
       });
       stdout.write(`Applied proposal to ${storeRoot}\n`);
@@ -257,10 +213,11 @@ export async function runCli(
   }
 
   if (command === "compile") {
+    const services = applicationServices();
     const requestedTarget = optionValue(args, "--target");
     const targets =
       requestedTarget === undefined ? undefined : [requestedTarget as CompileTarget];
-    const compiled = await compileContext(projectRoot, storeRoot, targets);
+    const compiled = await services.compile({ targets });
     for (const { path } of compiled) {
       stdout.write(`Compiled ${path}\n`);
     }
@@ -268,17 +225,30 @@ export async function runCli(
   }
 
   if (command === "web") {
+    const services = applicationServices();
     const output = resolve(
       projectRoot,
       optionValue(args, "--out") ?? "docs/index.html",
     );
-    await generateTimeline(storeRoot, output);
+    await generateTimelineFromSnapshot(await services.readSnapshot(), output);
     stdout.write(`Generated ${output}\n`);
     return;
   }
 
   if (command === "serve") {
-    await serveMcp(storeRoot);
+    await serveMcp(applicationServices());
+    return;
+  }
+
+  if (command === "ui") {
+    const services = applicationServices({ respectMockEnvironment: true });
+    // Validate launch-scoped provider configuration before opening a browser.
+    // API-key lookup remains deferred until the user explicitly previews.
+    await services.getUiConfig();
+    await (dependencies.startUiServer ?? startUiServer)({
+      applicationServices: services,
+    });
+    stdout.write("Opened ParallaX local UI in the system browser.\n");
     return;
   }
 

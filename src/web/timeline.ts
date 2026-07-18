@@ -472,7 +472,19 @@ export async function generateTimeline(
   outputPath: string,
   options: { generatedAt?: string } = {},
 ): Promise<void> {
-  const snapshot = await readStore(storeRoot);
+  await generateTimelineFromSnapshot(await readStore(storeRoot), outputPath, options);
+}
+
+/**
+ * Write a static timeline from an already-read approved-store snapshot.
+ * This lets command surfaces share one application-level store reader while
+ * retaining the original store-root convenience API for callers and fixtures.
+ */
+export async function generateTimelineFromSnapshot(
+  snapshot: StoreSnapshot,
+  outputPath: string,
+  options: { generatedAt?: string } = {},
+): Promise<void> {
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, renderTimelineHtml(snapshot, options), "utf8");
 }

@@ -35,7 +35,7 @@ Requires Node.js 20 or later.
 ```sh
 pnpm install
 pnpm run check
-pnpm run dev -- init
+pnpm run dev init
 ```
 
 `init` creates the durable `.parallax/` store. Commit this plain-file,
@@ -44,11 +44,11 @@ API key. For live imports, add a local `.env` (gitignored) from the tracked
 template, or select a provider and prompt for its key on a TTY:
 
 ```sh
-pnpm run dev -- init --env
-pnpm run dev -- init --provider openai --api-key
-pnpm run dev -- init --provider gemini --api-key
-pnpm run dev -- init --provider openai-compatible --api-key
-pnpm run dev -- init --provider claude --api-key
+pnpm run dev init --env
+pnpm run dev init --provider openai --api-key
+pnpm run dev init --provider gemini --api-key
+pnpm run dev init --provider openai-compatible --api-key
+pnpm run dev init --provider claude --api-key
 ```
 
 `--env` creates `.env` from `.env.example` only when it is absent.
@@ -77,6 +77,7 @@ parallax import <chat-export> --provider claude
 parallax compile
 parallax serve
 parallax web
+parallax ui
 ```
 
 Every store-facing command accepts `--store <path>`. Paths are relative to the
@@ -112,10 +113,10 @@ Spec: revise | Demo publishing | Commit the generated static page with the fixtu
 ```
 
 ```sh
-pnpm run dev -- init
-PARALLAX_MOCK=1 pnpm run dev -- import chat.md
-PARALLAX_MOCK=1 pnpm run dev -- import chat.md --apply
-PARALLAX_MOCK=1 pnpm run dev -- import chat.md --review
+pnpm run dev init
+PARALLAX_MOCK=1 pnpm run dev import chat.md
+PARALLAX_MOCK=1 pnpm run dev import chat.md --apply
+PARALLAX_MOCK=1 pnpm run dev import chat.md --review
 ```
 
 An import without `--apply` or `--review` prints a preview and writes nothing.
@@ -133,8 +134,8 @@ An empty selection or declined confirmation writes no source or records.
 For a live import, set the matching key and select the provider explicitly:
 
 ```sh
-pnpm run dev -- import chat.md --provider openai
-pnpm run dev -- import chat.md --provider gemini
+pnpm run dev import chat.md --provider openai
+pnpm run dev import chat.md --provider gemini
 ```
 
 Use `--model <name>` or `PARALLAX_MODEL` to override the provider default.
@@ -265,6 +266,52 @@ questions, glossary terms, spec changes, and stored evidence, and supports
 client-side search and filtering with no network calls. `serve`
 starts a read-only MCP stdio server with `get_context`, `search`,
 `get_decision`, and `list_tasks` tools.
+
+### Local UI
+
+`ui` starts a local browser interface for the same approved store used by the
+CLI. It binds only to `127.0.0.1` on a temporary port and opens the system
+browser. It is not a hosted service and it does not synchronize data anywhere.
+
+```sh
+PARALLAX_MOCK=1 pnpm run dev ui
+pnpm run dev ui --root /path/to/project --store .parallax.local
+pnpm run dev ui --provider openai --model gpt-5.6
+```
+
+To inspect the populated synthetic sample instead of your project store, run:
+
+```sh
+PARALLAX_MOCK=1 pnpm run dev ui --root . --store demo/store
+```
+
+`demo/store` is generated and tracked for demonstration. Browse it freely, but
+do not apply imports there unless you intend to regenerate it with
+`pnpm run demo:build`.
+
+The UI reads generic Markdown and extracted ChatGPT `conversations.json`
+exports from a browser file picker or pasted text. A ChatGPT export with
+multiple conversations requires an explicit browser selection. Imported text
+is held only in browser and server memory while it is reviewed; it is limited
+to 25 MiB per request and is never written until the user selects verified
+items and confirms the apply operation. A new preview replaces the prior
+in-memory proposal.
+
+The browser can choose a provider and model for a preview, using the same
+server-side provider resolver as the CLI. API keys, key environment variable
+names, compatible-provider base URLs, and local presets never enter the
+browser. Passing `--mock` or setting `PARALLAX_MOCK=1` locks the UI to mock
+mode for that launch, so browser controls cannot trigger a live provider. The
+UI starts with a fresh 32-byte session capability in the launch URL fragment
+and requires it for every API call. It stays out of browser storage and
+cookies, and is not printed if browser launch fails. The UI offers only
+approved-store browsing, selective import apply, and
+constrained compile targets. Record editing, proposal persistence, cloud sync,
+and desktop packaging remain outside V1.
+
+`web` remains different: it generates a portable, read-only static snapshot
+for a local file or public hosting. The `ui` command always reads the current
+local `.parallax` store instead.
 
 ### Deterministic demo and GitHub Pages
 
