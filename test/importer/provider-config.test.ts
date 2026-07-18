@@ -200,7 +200,7 @@ describe("resolveProviderConfig", () => {
   it("rejects unknown and contradictory provider selections", () => {
     expect(() =>
       resolveProviderConfig({ cliProvider: "unknown", cliMock: false }),
-    ).toThrow(/mock, openai, gemini, openai-compatible/);
+    ).toThrow(/mock, openai, gemini, openai-compatible, claude/);
     expect(() =>
       resolveProviderConfig({ cliProvider: "gemini", cliMock: true }),
     ).toThrow(/conflicts/);
@@ -212,6 +212,27 @@ describe("resolveProviderConfig", () => {
       }),
     ).toThrow(/conflicts/);
   });
+
+  it("requires an explicit model for claude", () => {
+    expect(() =>
+      resolveProviderConfig({
+        cliProvider: "claude",
+        cliMock: false,
+      }),
+    ).toThrow(/requires an explicit model/);
+
+    expect(
+      resolveProviderConfig({
+        cliProvider: "claude",
+        cliMock: false,
+        cliModel: "claude-test",
+      }),
+    ).toEqual({
+      provider: "claude",
+      model: "claude-test",
+      apiKeyEnv: "ANTHROPIC_API_KEY",
+    });
+  });
 });
 
 describe("apiKeyEnvForInit", () => {
@@ -219,13 +240,14 @@ describe("apiKeyEnvForInit", () => {
     expect(apiKeyEnvForInit("openai")).toBe("OPENAI_API_KEY");
     expect(apiKeyEnvForInit("gemini")).toBe("GEMINI_API_KEY");
     expect(apiKeyEnvForInit("openai-compatible")).toBe("OPENAI_API_KEY");
+    expect(apiKeyEnvForInit("claude")).toBe("ANTHROPIC_API_KEY");
   });
 
   it("rejects absent, mock, and unknown providers", () => {
     expect(() => apiKeyEnvForInit(undefined)).toThrow(/select a live provider/);
     expect(() => apiKeyEnvForInit("mock")).toThrow(/select a live provider/);
     expect(() => apiKeyEnvForInit("other")).toThrow(
-      /mock, openai, gemini, openai-compatible/,
+      /mock, openai, gemini, openai-compatible, claude/,
     );
   });
 });

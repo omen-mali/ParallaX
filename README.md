@@ -39,13 +39,15 @@ pnpm run dev -- init --env
 pnpm run dev -- init --provider openai --api-key
 pnpm run dev -- init --provider gemini --api-key
 pnpm run dev -- init --provider openai-compatible --api-key
+pnpm run dev -- init --provider claude --api-key
 ```
 
 `--env` creates `.env` from `.env.example` only when it is absent.
 `--api-key` requires an explicit live provider and never accepts the key on the
-command line. It prompts securely, writes only `OPENAI_API_KEY` or
-`GEMINI_API_KEY`, and sets owner-only permissions where supported.
-Existing shell environment variables always take precedence over `.env`.
+command line. It prompts securely, writes only `OPENAI_API_KEY`,
+`GEMINI_API_KEY`, or `ANTHROPIC_API_KEY`, and sets owner-only permissions where
+supported. Existing shell environment variables always take precedence over
+`.env`.
 
 ## Commands
 
@@ -55,10 +57,12 @@ parallax init --env
 parallax init --provider openai --api-key
 parallax init --provider gemini --api-key
 parallax init --provider openai-compatible --api-key
+parallax init --provider claude --api-key
 parallax import <chat-export>
 parallax import <chat-export> --provider openai
 parallax import <chat-export> --provider gemini
 parallax import <chat-export> --provider openai-compatible
+parallax import <chat-export> --provider claude
 parallax compile
 parallax serve
 parallax web
@@ -81,10 +85,10 @@ store source metadata without transcript text, or use an ignored local store.
 ParallaX never silently changes the retention choice.
 
 The importer supports deterministic mock extraction, OpenAI Responses, Gemini
-Interactions, and OpenAI-compatible Chat Completions (custom `baseUrl` via local
-preset only). Every provider is constrained by a portable JSON Schema,
-validated again locally with Zod, and then checked against exact transcript
-quotes. Mock extracts only explicit line-level markers:
+Interactions, OpenAI-compatible Chat Completions (custom `baseUrl` via local
+preset only), and Claude Messages. Every provider is constrained by a portable
+JSON Schema, validated again locally with Zod, and then checked against exact
+transcript quotes. Mock extracts only explicit line-level markers:
 
 ```md
 ## User
@@ -114,12 +118,13 @@ only guaranteed zero-cost path; no live provider is assumed to be free.
 
 ### Provider capabilities
 
-| Provider            | Protocol                     | Structured output               | Storage          | Cost                                |
-| ------------------- | ---------------------------- | ------------------------------- | ---------------- | ----------------------------------- |
-| `mock`              | Deterministic markers        | N/A (local)                     | N/A              | Always free                         |
-| `openai`            | OpenAI Responses API         | Portable JSON Schema (`strict`) | `store: false`   | Paid; not used in CI                |
-| `gemini`            | Gemini Interactions API      | Portable JSON Schema subset     | `store: false`   | Free-tier may apply; not used in CI |
-| `openai-compatible` | Chat Completions (`baseUrl`) | Portable JSON Schema (`strict`) | Endpoint-defined | Endpoint-dependent; not used in CI  |
+| Provider            | Protocol                     | Structured output                  | Storage          | Cost                                |
+| ------------------- | ---------------------------- | ---------------------------------- | ---------------- | ----------------------------------- |
+| `mock`              | Deterministic markers        | N/A (local)                        | N/A              | Always free                         |
+| `openai`            | OpenAI Responses API         | Portable JSON Schema (`strict`)    | `store: false`   | Paid; not used in CI                |
+| `gemini`            | Gemini Interactions API      | Portable JSON Schema subset        | `store: false`   | Free-tier may apply; not used in CI |
+| `openai-compatible` | Chat Completions (`baseUrl`) | Portable JSON Schema (`strict`)    | Endpoint-defined | Endpoint-dependent; not used in CI  |
+| `claude`            | Anthropic Messages API       | `output_config.format` JSON Schema | Provider-managed | Paid; not used in CI                |
 
 The model-facing schema is a lowest-common-denominator JSON Schema: Gemini-
 unsupported keywords such as `minLength` and `pattern` are stripped before the
@@ -160,7 +165,9 @@ apiKeyEnv: OPENAI_API_KEY
 
 Configuration precedence is CLI, environment, local preset, then safe mock
 defaults. ParallaX never infers a provider from whichever API key is present.
-Selecting `mock` never loads OpenAI, Gemini, or OpenAI-compatible SDK clients.
+Selecting `mock` never loads OpenAI, Gemini, OpenAI-compatible, or Claude SDK
+clients. `claude` and `openai-compatible` require an explicit model via the
+preset, `--model`, or `PARALLAX_MODEL`.
 
 ### Gated Gemini live smoke
 
@@ -192,6 +199,16 @@ PARALLAX_COMPATIBLE_LIVE_SMOKE=1 \
 Optional: `PARALLAX_COMPATIBLE_API_KEY_ENV` to select a non-default key variable.
 `baseUrl` must be http(s) without embedded credentials. Transcript
 retention/storage is endpoint-defined; ParallaX makes no retention guarantee.
+Excluded from `pnpm test` and `pnpm run check`.
+
+### Gated Claude live smoke
+
+```sh
+PARALLAX_CLAUDE_LIVE_SMOKE=1 ANTHROPIC_API_KEY=... PARALLAX_MODEL=claude-sonnet-4-5 \
+  pnpm run smoke:claude
+```
+
+Uses one Messages request with portable JSON Schema via `output_config.format`.
 Excluded from `pnpm test` and `pnpm run check`.
 
 `compile` writes concise, approved context into safe managed blocks in

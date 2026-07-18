@@ -4,9 +4,19 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
 
-import type { LiveProviderId, ProviderId } from "./distiller.js";
+import type {
+  LiveProviderId,
+  ProviderId,
+  ProvidersRequiringExplicitModel,
+} from "./distiller.js";
 
-const ProviderIdSchema = z.enum(["mock", "openai", "gemini", "openai-compatible"]);
+const ProviderIdSchema = z.enum([
+  "mock",
+  "openai",
+  "gemini",
+  "openai-compatible",
+  "claude",
+]);
 const ApiKeyEnvSchema = z.string().regex(/^[A-Z][A-Z0-9_]*$/);
 
 /**
@@ -73,9 +83,9 @@ const ProviderPresetSchema = z
 
 export type ProviderPreset = z.infer<typeof ProviderPresetSchema>;
 
-/** Defaults for providers with a known first-party model. openai-compatible has none. */
+/** Defaults for providers with a known first-party model. */
 export const DEFAULT_MODELS: Record<
-  Exclude<ProviderId, "openai-compatible">,
+  Exclude<ProviderId, ProvidersRequiringExplicitModel>,
   string
 > = {
   mock: "mock",
@@ -87,9 +97,16 @@ export const DEFAULT_API_KEY_ENV: Record<LiveProviderId, string> = {
   openai: "OPENAI_API_KEY",
   gemini: "GEMINI_API_KEY",
   "openai-compatible": "OPENAI_API_KEY",
+  claude: "ANTHROPIC_API_KEY",
 };
 
-const PROVIDER_LIST = "mock, openai, gemini, openai-compatible";
+const PROVIDER_LIST = "mock, openai, gemini, openai-compatible, claude";
+
+function requiresExplicitModel(
+  provider: ProviderId,
+): provider is ProvidersRequiringExplicitModel {
+  return provider === "openai-compatible" || provider === "claude";
+}
 
 export function parseProviderId(value: string, source: string): ProviderId {
   const result = ProviderIdSchema.safeParse(value);
@@ -102,13 +119,13 @@ export function parseProviderId(value: string, source: string): ProviderId {
 export function apiKeyEnvForInit(providerValue: string | undefined): string {
   if (providerValue === undefined) {
     throw new Error(
-      "Use `init --provider openai|gemini|openai-compatible --api-key` to select a live provider.",
+      "Use `init --provider openai|gemini|openai-compatible|claude --api-key` to select a live provider.",
     );
   }
   const provider = parseProviderId(providerValue, "--provider");
   if (provider === "mock") {
     throw new Error(
-      "Use `init --provider openai|gemini|openai-compatible --api-key` to select a live provider.",
+      "Use `init --provider openai|gemini|openai-compatible|claude --api-key` to select a live provider.",
     );
   }
   return DEFAULT_API_KEY_ENV[provider];
@@ -201,17 +218,17 @@ export function resolveProviderConfig(
     options.envModel ??
     (options.preset?.provider === provider ? options.preset.model : undefined);
 
-  if (provider === "openai-compatible") {
+  if (requiresExplicitModel(provider)) {
     if (explicitModel === undefined || explicitModel.length === 0) {
       throw new Error(
-        "openai-compatible requires an explicit model via --model, PARALLAX_MODEL, or .local/providers.yaml.",
+        `${provider} requires an explicit model via --model, PARALLAX_MODEL, or .local/providers.yaml.`,
       );
     }
   }
 
   const model =
     explicitModel ??
-    DEFAULT_MODELS[provider as Exclude<ProviderId, "openai-compatible">];
+    DEFAULT_MODELS[provider as Exclude<ProviderId, ProvidersRequiringExplicitModel>];
 
   if (provider === "mock") {
     return { provider, model };

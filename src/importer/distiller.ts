@@ -13,8 +13,9 @@ import { ProviderMalformedOutputError } from "./provider-errors.js";
 
 export type { JsonSchema } from "./distillation-schema.js";
 
-export type ProviderId = "mock" | "openai" | "gemini" | "openai-compatible";
+export type ProviderId = "mock" | "openai" | "gemini" | "openai-compatible" | "claude";
 export type LiveProviderId = Exclude<ProviderId, "mock">;
+export type ProvidersRequiringExplicitModel = "openai-compatible" | "claude";
 
 export interface DistillationRequest {
   instructions: string;
