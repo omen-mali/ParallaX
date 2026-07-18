@@ -15,6 +15,10 @@ import {
   type GeminiInteractionRequest,
 } from "../../src/importer/gemini-distiller.js";
 import { OpenAIDistiller } from "../../src/importer/openai-distiller.js";
+import {
+  OpenAICompatibleDistiller,
+  type CompatibleChatCompletionRequest,
+} from "../../src/importer/openai-compatible-distiller.js";
 
 const chat = NormalizedChatSchema.parse({
   schemaVersion: 1,
@@ -197,5 +201,98 @@ describe("GeminiDistiller", () => {
         apiKey: "test-key",
       }),
     ).rejects.toThrow("gemini refused the request.");
+  });
+});
+
+describe("OpenAICompatibleDistiller", () => {
+  it("submits chat-completions json_schema with portable schema", async () => {
+    let captured: CompatibleChatCompletionRequest | undefined;
+    let capturedBaseUrl: string | undefined;
+    const distiller = new OpenAICompatibleDistiller(({ baseUrl }) => {
+      capturedBaseUrl = baseUrl;
+      return {
+        create: async (request) => {
+          captured = request;
+          return { content: JSON.stringify(validDelta) };
+        },
+      };
+    });
+
+    await expect(
+      distiller.distill(chat, digest, {
+        model: "compat-model",
+        apiKey: "test-key",
+        baseUrl: "https://api.example.com/v1",
+      }),
+    ).resolves.toEqual(validDelta);
+
+    expect(capturedBaseUrl).toBe("https://api.example.com/v1");
+    expect(captured).toMatchObject({
+      model: "compat-model",
+      messages: [{ role: "system" }, { role: "user" }],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "parallax_import_delta",
+          schema: IMPORT_DELTA_JSON_SCHEMA,
+          strict: true,
+        },
+      },
+    });
+    expect(captured?.messages[0]?.content).toContain("untrusted data");
+    expect(captured?.messages[1]?.content).toContain("[TURN 0 | ROLE user]");
+  });
+
+  it("requires baseUrl and sanitizes transport failures", async () => {
+    const distiller = new OpenAICompatibleDistiller(() => ({
+      create: async () => {
+        throw new Error("secret-key Question: Which provider? raw-response");
+      },
+    }));
+
+    await expect(
+      distiller.distill(chat, digest, {
+        model: "compat-model",
+        apiKey: "secret-key",
+      }),
+    ).rejects.toThrow(/requires baseUrl/);
+
+    await expect(
+      distiller.distill(chat, digest, {
+        model: "compat-model",
+        apiKey: "secret-key",
+        baseUrl: "https://api.example.com/v1",
+      }),
+    ).rejects.toThrow(
+      "openai-compatible distillation failed. Check provider credentials, model access, and service availability.",
+    );
+  });
+
+  it("treats empty content as a refusal and hides malformed bodies", async () => {
+    await expect(
+      new OpenAICompatibleDistiller(() => ({
+        create: async () => ({ content: "  " }),
+      })).distill(chat, digest, {
+        model: "compat-model",
+        apiKey: "test-key",
+        baseUrl: "https://api.example.com/v1",
+      }),
+    ).rejects.toThrow("openai-compatible refused the request.");
+
+    const raw = "raw-sensitive-response";
+    try {
+      await new OpenAICompatibleDistiller(() => ({
+        create: async () => ({ content: raw }),
+      })).distill(chat, digest, {
+        model: "compat-model",
+        apiKey: "test-key",
+        baseUrl: "https://api.example.com/v1",
+      });
+      throw new Error("Expected malformed output to fail.");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toBe("openai-compatible returned an invalid import proposal.");
+      expect(message).not.toContain(raw);
+    }
   });
 });

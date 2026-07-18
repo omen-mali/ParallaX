@@ -13,7 +13,7 @@ import { ProviderMalformedOutputError } from "./provider-errors.js";
 
 export type { JsonSchema } from "./distillation-schema.js";
 
-export type ProviderId = "mock" | "openai" | "gemini";
+export type ProviderId = "mock" | "openai" | "gemini" | "openai-compatible";
 export type LiveProviderId = Exclude<ProviderId, "mock">;
 
 export interface DistillationRequest {
@@ -26,6 +26,8 @@ export interface DistillationRequest {
 export interface DistillOptions {
   model: string;
   apiKey?: string;
+  /** Required for openai-compatible; supplied only from local preset baseUrl. */
+  baseUrl?: string;
 }
 
 export interface Distiller {

@@ -6,14 +6,16 @@ import { z } from "zod";
 
 import type { LiveProviderId, ProviderId } from "./distiller.js";
 
-const ProviderIdSchema = z.enum(["mock", "openai", "gemini"]);
+const ProviderIdSchema = z.enum(["mock", "openai", "gemini", "openai-compatible"]);
 const ApiKeyEnvSchema = z.string().regex(/^[A-Z][A-Z0-9_]*$/);
+const BaseUrlSchema = z.string().url();
 
 const ProviderPresetSchema = z
   .object({
     provider: ProviderIdSchema,
     model: z.string().min(1).optional(),
     apiKeyEnv: ApiKeyEnvSchema.optional(),
+    baseUrl: BaseUrlSchema.optional(),
   })
   .strict()
   .superRefine((preset, context) => {
@@ -24,11 +26,29 @@ const ProviderPresetSchema = z
         message: "Mock provider cannot use an API key.",
       });
     }
+    if (preset.provider === "openai-compatible" && preset.baseUrl === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["baseUrl"],
+        message: "openai-compatible requires baseUrl.",
+      });
+    }
+    if (preset.provider !== "openai-compatible" && preset.baseUrl !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["baseUrl"],
+        message: "baseUrl is only supported for openai-compatible.",
+      });
+    }
   });
 
 export type ProviderPreset = z.infer<typeof ProviderPresetSchema>;
 
-export const DEFAULT_MODELS: Record<ProviderId, string> = {
+/** Defaults for providers with a known first-party model. openai-compatible has none. */
+export const DEFAULT_MODELS: Record<
+  Exclude<ProviderId, "openai-compatible">,
+  string
+> = {
   mock: "mock",
   openai: "gpt-5.6",
   gemini: "gemini-3.5-flash",
@@ -37,12 +57,15 @@ export const DEFAULT_MODELS: Record<ProviderId, string> = {
 export const DEFAULT_API_KEY_ENV: Record<LiveProviderId, string> = {
   openai: "OPENAI_API_KEY",
   gemini: "GEMINI_API_KEY",
+  "openai-compatible": "OPENAI_API_KEY",
 };
+
+const PROVIDER_LIST = "mock, openai, gemini, openai-compatible";
 
 export function parseProviderId(value: string, source: string): ProviderId {
   const result = ProviderIdSchema.safeParse(value);
   if (!result.success) {
-    throw new Error(`${source} must be one of: mock, openai, gemini.`);
+    throw new Error(`${source} must be one of: ${PROVIDER_LIST}.`);
   }
   return result.data;
 }
@@ -50,13 +73,13 @@ export function parseProviderId(value: string, source: string): ProviderId {
 export function apiKeyEnvForInit(providerValue: string | undefined): string {
   if (providerValue === undefined) {
     throw new Error(
-      "Use `init --provider openai|gemini --api-key` to select a live provider.",
+      "Use `init --provider openai|gemini|openai-compatible --api-key` to select a live provider.",
     );
   }
   const provider = parseProviderId(providerValue, "--provider");
   if (provider === "mock") {
     throw new Error(
-      "Use `init --provider openai|gemini --api-key` to select a live provider.",
+      "Use `init --provider openai|gemini|openai-compatible --api-key` to select a live provider.",
     );
   }
   return DEFAULT_API_KEY_ENV[provider];
@@ -80,7 +103,7 @@ export async function loadProviderPreset(
     return ProviderPresetSchema.parse(parse(contents));
   } catch {
     throw new Error(
-      "Invalid .local/providers.yaml. Only provider, model, and apiKeyEnv are supported.",
+      "Invalid .local/providers.yaml. Only provider, model, apiKeyEnv, and baseUrl are supported.",
     );
   }
 }
@@ -99,6 +122,7 @@ export interface ResolvedProviderConfig {
   provider: ProviderId;
   model: string;
   apiKeyEnv?: string;
+  baseUrl?: string;
 }
 
 export function resolveProviderApiKey(
@@ -143,21 +167,40 @@ export function resolveProviderConfig(
     (envMock ? "mock" : undefined) ??
     options.preset?.provider ??
     "mock";
-  const model =
+  const explicitModel =
     options.cliModel ??
     options.envModel ??
-    (options.preset?.provider === provider ? options.preset.model : undefined) ??
-    DEFAULT_MODELS[provider];
+    (options.preset?.provider === provider ? options.preset.model : undefined);
+
+  if (provider === "openai-compatible") {
+    if (explicitModel === undefined || explicitModel.length === 0) {
+      throw new Error(
+        "openai-compatible requires an explicit model via --model, PARALLAX_MODEL, or .local/providers.yaml.",
+      );
+    }
+  }
+
+  const model =
+    explicitModel ??
+    DEFAULT_MODELS[provider as Exclude<ProviderId, "openai-compatible">];
 
   if (provider === "mock") {
     return { provider, model };
+  }
+
+  const presetMatches = options.preset?.provider === provider;
+  const baseUrl = presetMatches ? options.preset?.baseUrl : undefined;
+
+  if (provider === "openai-compatible" && baseUrl === undefined) {
+    throw new Error("openai-compatible requires baseUrl in .local/providers.yaml.");
   }
 
   return {
     provider,
     model,
     apiKeyEnv:
-      (options.preset?.provider === provider ? options.preset.apiKeyEnv : undefined) ??
+      (presetMatches ? options.preset?.apiKeyEnv : undefined) ??
       DEFAULT_API_KEY_ENV[provider],
+    ...(baseUrl === undefined ? {} : { baseUrl }),
   };
 }
