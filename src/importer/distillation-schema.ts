@@ -25,18 +25,37 @@ const STRIPPED_KEYWORDS = new Set([
   ...GEMINI_UNSUPPORTED_SCHEMA_KEYWORDS,
 ]);
 
+/**
+ * Strip unsupported schema keywords recursively.
+ * Keys under a `properties` map are domain field names and must be preserved
+ * even when they collide with annotation names such as `title`.
+ */
 export function stripUnsupportedSchemaKeywords(value: unknown): unknown {
+  return stripSchemaNode(value, "schema");
+}
+
+function stripSchemaNode(value: unknown, context: "schema" | "propertiesMap"): unknown {
   if (Array.isArray(value)) {
-    return value.map(stripUnsupportedSchemaKeywords);
+    return value.map((child) => stripSchemaNode(child, "schema"));
   }
   if (value === null || typeof value !== "object") {
     return value;
   }
 
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (context === "propertiesMap") {
+    return Object.fromEntries(
+      entries.map(([key, child]) => [key, stripSchemaNode(child, "schema")]),
+    );
+  }
+
   return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
+    entries
       .filter(([key]) => !STRIPPED_KEYWORDS.has(key))
-      .map(([key, child]) => [key, stripUnsupportedSchemaKeywords(child)]),
+      .map(([key, child]) => [
+        key,
+        stripSchemaNode(child, key === "properties" ? "propertiesMap" : "schema"),
+      ]),
   );
 }
 

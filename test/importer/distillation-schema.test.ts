@@ -249,6 +249,49 @@ describe("portable distillation schema", () => {
     expect(geminiSchema).toBe(IMPORT_DELTA_JSON_SCHEMA);
   });
 
+  it("preserves domain property names that collide with annotation keywords", () => {
+    const decisionItems = (
+      (IMPORT_DELTA_JSON_SCHEMA.properties as Record<string, Record<string, unknown>>)
+        .decisions.items as Record<string, unknown>
+    ).properties as Record<string, unknown>;
+    const taskItems = (
+      (IMPORT_DELTA_JSON_SCHEMA.properties as Record<string, Record<string, unknown>>)
+        .tasks.items as Record<string, unknown>
+    ).properties as Record<string, unknown>;
+
+    expect(decisionItems).toHaveProperty("title");
+    expect(taskItems).toHaveProperty("title");
+    expect(
+      (
+        (IMPORT_DELTA_JSON_SCHEMA.properties as Record<string, Record<string, unknown>>)
+          .decisions.items as { required: string[] }
+      ).required,
+    ).toContain("title");
+
+    expect(
+      stripUnsupportedSchemaKeywords({
+        type: "object",
+        title: "annotation-drop",
+        properties: {
+          title: {
+            type: "string",
+            title: "nested-annotation-drop",
+            minLength: 1,
+          },
+        },
+        required: ["title"],
+      }),
+    ).toEqual({
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+        },
+      },
+      required: ["title"],
+    });
+  });
+
   it("strips nested unsupported keywords from arbitrary objects", () => {
     expect(
       stripUnsupportedSchemaKeywords({
