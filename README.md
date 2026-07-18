@@ -38,6 +38,7 @@ template, or select a provider and prompt for its key on a TTY:
 pnpm run dev -- init --env
 pnpm run dev -- init --provider openai --api-key
 pnpm run dev -- init --provider gemini --api-key
+pnpm run dev -- init --provider openai-compatible --api-key
 ```
 
 `--env` creates `.env` from `.env.example` only when it is absent.
@@ -53,9 +54,11 @@ parallax init
 parallax init --env
 parallax init --provider openai --api-key
 parallax init --provider gemini --api-key
+parallax init --provider openai-compatible --api-key
 parallax import <chat-export>
 parallax import <chat-export> --provider openai
 parallax import <chat-export> --provider gemini
+parallax import <chat-export> --provider openai-compatible
 parallax compile
 parallax serve
 parallax web
@@ -77,8 +80,9 @@ source transcript by default. For sensitive material, use `--metadata-only` to
 store source metadata without transcript text, or use an ignored local store.
 ParallaX never silently changes the retention choice.
 
-The importer supports deterministic mock extraction, OpenAI Responses, and
-Gemini Interactions. Every provider is constrained by a portable JSON Schema,
+The importer supports deterministic mock extraction, OpenAI Responses, Gemini
+Interactions, and OpenAI-compatible Chat Completions (custom `baseUrl` via local
+preset only). Every provider is constrained by a portable JSON Schema,
 validated again locally with Zod, and then checked against exact transcript
 quotes. Mock extracts only explicit line-level markers:
 
@@ -110,11 +114,12 @@ only guaranteed zero-cost path; no live provider is assumed to be free.
 
 ### Provider capabilities
 
-| Provider | Protocol                | Structured output               | Storage        | Cost                                |
-| -------- | ----------------------- | ------------------------------- | -------------- | ----------------------------------- |
-| `mock`   | Deterministic markers   | N/A (local)                     | N/A            | Always free                         |
-| `openai` | OpenAI Responses API    | Portable JSON Schema (`strict`) | `store: false` | Paid; not used in CI                |
-| `gemini` | Gemini Interactions API | Portable JSON Schema subset     | `store: false` | Free-tier may apply; not used in CI |
+| Provider            | Protocol                     | Structured output               | Storage          | Cost                                |
+| ------------------- | ---------------------------- | ------------------------------- | ---------------- | ----------------------------------- |
+| `mock`              | Deterministic markers        | N/A (local)                     | N/A              | Always free                         |
+| `openai`            | OpenAI Responses API         | Portable JSON Schema (`strict`) | `store: false`   | Paid; not used in CI                |
+| `gemini`            | Gemini Interactions API      | Portable JSON Schema subset     | `store: false`   | Free-tier may apply; not used in CI |
+| `openai-compatible` | Chat Completions (`baseUrl`) | Portable JSON Schema (`strict`) | Endpoint-defined | Endpoint-dependent; not used in CI  |
 
 The model-facing schema is a lowest-common-denominator JSON Schema: Gemini-
 unsupported keywords such as `minLength` and `pattern` are stripped before the
@@ -141,9 +146,21 @@ model: gemini-3.5-flash
 apiKeyEnv: GEMINI_API_KEY
 ```
 
+OpenAI-compatible endpoints require a YAML `baseUrl` (no CLI/env base URL in
+V1) and an explicit model via the preset, `--model`, or `PARALLAX_MODEL`. The
+endpoint receives the transcript and may retain it under its own policy; ParallaX
+makes no retention guarantee for compatible providers:
+
+```yaml
+provider: openai-compatible
+model: some-model
+baseUrl: https://api.example.com/v1
+apiKeyEnv: OPENAI_API_KEY
+```
+
 Configuration precedence is CLI, environment, local preset, then safe mock
 defaults. ParallaX never infers a provider from whichever API key is present.
-Selecting `mock` never loads OpenAI or Gemini SDK clients.
+Selecting `mock` never loads OpenAI, Gemini, or OpenAI-compatible SDK clients.
 
 ### Gated Gemini live smoke
 

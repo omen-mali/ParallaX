@@ -4,17 +4,21 @@ export type DistillerModuleLoader = {
   loadMock: () => Promise<{ MockDistiller: new () => Distiller }>;
   loadOpenAI: () => Promise<{ OpenAIDistiller: new () => Distiller }>;
   loadGemini: () => Promise<{ GeminiDistiller: new () => Distiller }>;
+  loadOpenAICompatible: () => Promise<{
+    OpenAICompatibleDistiller: new () => Distiller;
+  }>;
 };
 
 const defaultLoaders: DistillerModuleLoader = {
   loadMock: () => import("./mock-distiller.js"),
   loadOpenAI: () => import("./openai-distiller.js"),
   loadGemini: () => import("./gemini-distiller.js"),
+  loadOpenAICompatible: () => import("./openai-compatible-distiller.js"),
 };
 
 /**
  * Lazily load only the selected provider module so mock never imports
- * OpenAI or Gemini SDK clients.
+ * OpenAI, Gemini, or OpenAI-compatible SDK clients.
  */
 export async function createDistiller(
   provider: ProviderId,
@@ -32,6 +36,10 @@ export async function createDistiller(
     case "gemini": {
       const { GeminiDistiller } = await loaders.loadGemini();
       return new GeminiDistiller();
+    }
+    case "openai-compatible": {
+      const { OpenAICompatibleDistiller } = await loaders.loadOpenAICompatible();
+      return new OpenAICompatibleDistiller();
     }
   }
 }

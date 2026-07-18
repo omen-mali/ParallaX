@@ -56,10 +56,84 @@ describe("resolveProviderConfig", () => {
     });
   });
 
+  it("requires preset baseUrl and an explicit model for openai-compatible", () => {
+    expect(() =>
+      resolveProviderConfig({
+        cliProvider: "openai-compatible",
+        cliMock: false,
+      }),
+    ).toThrow(/requires an explicit model/);
+
+    expect(() =>
+      resolveProviderConfig({
+        cliMock: false,
+        preset: {
+          provider: "openai-compatible",
+          baseUrl: "https://api.example.com/v1",
+        },
+      }),
+    ).toThrow(/requires an explicit model/);
+
+    expect(() =>
+      resolveProviderConfig({
+        cliProvider: "openai-compatible",
+        cliMock: false,
+        cliModel: "compat-model",
+      }),
+    ).toThrow(/requires baseUrl in \.local\/providers\.yaml/);
+
+    expect(
+      resolveProviderConfig({
+        cliMock: false,
+        preset: {
+          provider: "openai-compatible",
+          model: "compat-model",
+          baseUrl: "https://api.example.com/v1",
+          apiKeyEnv: "COMPAT_KEY",
+        },
+      }),
+    ).toEqual({
+      provider: "openai-compatible",
+      model: "compat-model",
+      apiKeyEnv: "COMPAT_KEY",
+      baseUrl: "https://api.example.com/v1",
+    });
+
+    expect(
+      resolveProviderConfig({
+        cliProvider: "openai-compatible",
+        cliMock: false,
+        envModel: "env-compat-model",
+        preset: {
+          provider: "openai-compatible",
+          baseUrl: "https://api.example.com/v1",
+        },
+      }),
+    ).toEqual({
+      provider: "openai-compatible",
+      model: "env-compat-model",
+      apiKeyEnv: "OPENAI_API_KEY",
+      baseUrl: "https://api.example.com/v1",
+    });
+
+    expect(() =>
+      resolveProviderConfig({
+        cliProvider: "openai-compatible",
+        cliMock: false,
+        cliModel: "compat-model",
+        preset: {
+          provider: "gemini",
+          model: "gemini-test",
+          apiKeyEnv: "GEMINI_API_KEY",
+        },
+      }),
+    ).toThrow(/requires baseUrl in \.local\/providers\.yaml/);
+  });
+
   it("rejects unknown and contradictory provider selections", () => {
     expect(() =>
       resolveProviderConfig({ cliProvider: "unknown", cliMock: false }),
-    ).toThrow(/mock, openai, gemini/);
+    ).toThrow(/mock, openai, gemini, openai-compatible/);
     expect(() =>
       resolveProviderConfig({ cliProvider: "gemini", cliMock: true }),
     ).toThrow(/conflicts/);
@@ -77,12 +151,15 @@ describe("apiKeyEnvForInit", () => {
   it("maps explicit live providers to their key variables", () => {
     expect(apiKeyEnvForInit("openai")).toBe("OPENAI_API_KEY");
     expect(apiKeyEnvForInit("gemini")).toBe("GEMINI_API_KEY");
+    expect(apiKeyEnvForInit("openai-compatible")).toBe("OPENAI_API_KEY");
   });
 
   it("rejects absent, mock, and unknown providers", () => {
     expect(() => apiKeyEnvForInit(undefined)).toThrow(/select a live provider/);
     expect(() => apiKeyEnvForInit("mock")).toThrow(/select a live provider/);
-    expect(() => apiKeyEnvForInit("other")).toThrow(/mock, openai, gemini/);
+    expect(() => apiKeyEnvForInit("other")).toThrow(
+      /mock, openai, gemini, openai-compatible/,
+    );
   });
 });
 
@@ -129,6 +206,28 @@ describe("loadProviderPreset", () => {
     });
   });
 
+  it("loads openai-compatible presets with baseUrl", async () => {
+    const storeRoot = await mkdtemp(join(tmpdir(), "parallax-provider-"));
+    await mkdir(join(storeRoot, ".local"));
+    await writeFile(
+      join(storeRoot, ".local", "providers.yaml"),
+      [
+        "provider: openai-compatible",
+        "model: local-model",
+        "baseUrl: https://api.example.com/v1",
+        "apiKeyEnv: COMPAT_KEY",
+        "",
+      ].join("\n"),
+    );
+
+    await expect(loadProviderPreset(storeRoot)).resolves.toEqual({
+      provider: "openai-compatible",
+      model: "local-model",
+      baseUrl: "https://api.example.com/v1",
+      apiKeyEnv: "COMPAT_KEY",
+    });
+  });
+
   it("rejects keys and unsupported provider configuration fields", async () => {
     const storeRoot = await mkdtemp(join(tmpdir(), "parallax-provider-"));
     await mkdir(join(storeRoot, ".local"));
@@ -136,12 +235,17 @@ describe("loadProviderPreset", () => {
 
     await writeFile(path, "provider: gemini\napiKey: secret-must-not-live-here\n");
     await expect(loadProviderPreset(storeRoot)).rejects.toThrow(
-      /Only provider, model, and apiKeyEnv/,
+      /Only provider, model, apiKeyEnv, and baseUrl/,
     );
 
     await writeFile(path, "provider: openai-compatible\n");
     await expect(loadProviderPreset(storeRoot)).rejects.toThrow(
-      /Only provider, model, and apiKeyEnv/,
+      /Only provider, model, apiKeyEnv, and baseUrl/,
+    );
+
+    await writeFile(path, "provider: gemini\nbaseUrl: https://api.example.com/v1\n");
+    await expect(loadProviderPreset(storeRoot)).rejects.toThrow(
+      /Only provider, model, apiKeyEnv, and baseUrl/,
     );
   });
 });

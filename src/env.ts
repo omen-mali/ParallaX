@@ -14,6 +14,7 @@ GEMINI_API_KEY=
 # Optional provider and model overrides. Mock is the safe default.
 # PARALLAX_PROVIDER=mock
 # PARALLAX_MODEL=
+# openai-compatible also needs baseUrl in <store>/.local/providers.yaml
 `;
 
 const ENV_VARIABLE_NAME = /^[A-Z][A-Z0-9_]*$/;
