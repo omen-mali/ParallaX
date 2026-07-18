@@ -68,6 +68,7 @@ parallax init --provider gemini --api-key
 parallax init --provider openai-compatible --api-key
 parallax init --provider claude --api-key
 parallax import <chat-export>
+parallax import <chat-export> --review
 parallax import conversations.json --format chatgpt --conversation <id>
 parallax import <chat-export> --provider openai
 parallax import <chat-export> --provider gemini
@@ -113,7 +114,20 @@ Term: provenance - exact supporting chat text
 pnpm run dev -- init
 PARALLAX_MOCK=1 pnpm run dev -- import chat.md
 PARALLAX_MOCK=1 pnpm run dev -- import chat.md --apply
+PARALLAX_MOCK=1 pnpm run dev -- import chat.md --review
 ```
+
+An import without `--apply` or `--review` prints a preview and writes nothing.
+`--apply` remains the noninteractive option for scripts and applies the full
+verified proposal. `--review` is an interactive, TTY-only alternative: it
+displays stable item keys such as `d1`, `t2`, and `q1`, accepts a
+comma-separated selection, then asks for final confirmation before writing the
+selected items. It cannot be combined with `--apply`.
+
+Selection and confirmation happen in the same distillation session, so the
+proposal is never saved for later review and no second model call is needed.
+An empty selection or declined confirmation writes no source or records.
+`--metadata-only` also applies to an approved reviewed import.
 
 For a live import, set the matching key and select the provider explicitly:
 
