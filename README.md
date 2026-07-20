@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <sub><code>MIT</code> · <code>Node ≥ 20</code> · <code>mock-first — runs with zero API keys</code></sub>
+  <sub><code>MIT</code> · <code>Node 24.x</code> · <code>mock-first, zero API keys</code></sub>
 </p>
 
 ---
@@ -24,13 +24,18 @@ source of truth.
 
 ## Status
 
-The project foundation and validation contract are in place. The upcoming
-milestones harden the validated import pipeline, compiler, static explorer,
-and MCP read tools.
+The V1 core loop is delivered: validated imports with exact evidence and
+explicit apply, an approved plain-file store, safe compilation, read surfaces
+(MCP, static web, and local UI), and a deterministic mock demo published with
+GitHub Pages. GitHub Actions runs the offline `pnpm run check` gate for pull
+requests and pushes to `dev`.
+
+Lifecycle editing, persisted proposals, cloud synchronization, and desktop
+packaging remain intentionally deferred.
 
 ## Setup
 
-Requires Node.js 20 or later.
+Requires Node.js 24.x.
 
 ```sh
 pnpm install
