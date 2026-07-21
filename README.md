@@ -63,35 +63,6 @@ command line. It prompts securely, writes only `OPENAI_API_KEY`,
 supported. Existing shell environment variables always take precedence over
 `.env`.
 
-### Quickstart
-
-ParallaX supports macOS, Windows, and desktop Linux with Node.js 24.x and a
-system browser. The automated CI suite runs on Ubuntu. The fastest read-only
-evaluation path is the [public synthetic demo](https://omen-mali.github.io/ParallaX/).
-
-For a complete local verification and the populated browser interface:
-
-```sh
-corepack enable
-pnpm install --frozen-lockfile
-pnpm run check
-pnpm run dev ui --root . --store demo/store --mock
-```
-
-Browse the tracked `demo/store` without applying imports to it. To exercise the
-full import and selected-apply flow, use the ignored demo store instead:
-
-```sh
-pnpm run dev init --store .parallax-demo
-pnpm run dev ui --store .parallax-demo --mock
-```
-
-Mock mode is deterministic, performs no network requests, and requires no API
-key. The local UI binds only to `127.0.0.1`; imported content and pending
-proposals remain in browser and server memory until an explicitly selected
-proposal is applied. See [DEMO.md](DEMO.md) for the tested three-tool scenario
-and recording workflow.
-
 ## Commands
 
 ```text
@@ -358,36 +329,15 @@ pnpm run demo:check
 ```
 
 `demo:build` regenerates the owned `demo/store/` fixture store and
-`demo/site/index.html`. Do not hand-edit either generated output. `demo:check`
+`docs/index.html`. Do not hand-edit either generated output. `demo:check`
 rebuilds in a temporary location and fails if the tracked demo store or page
-has drifted from its fixtures. The separate `docs/index.html` path remains the
-default user-owned output of `parallax web`.
+has drifted from its fixtures.
 
-The Pages workflow publishes `demo/site/` only for pushes to `dev`. Before its
-first deployment, the repository owner must open **Settings > Pages** and
-choose **GitHub Actions** as the publishing source. The workflow uses GitHub's
+The Pages workflow publishes `docs/` only for pushes to `dev`. Before its first
+deployment, the repository owner must open **Settings > Pages** and choose
+**GitHub Actions** as the publishing source. The workflow uses GitHub's
 [custom Pages workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
 artifact upload and deployment steps.
-
-## Built with Codex and GPT-5.6
-
-Codex with GPT-5.6 was the planning and implementation collaborator throughout
-the V1 build. The primary Plan-Execute session was used to inspect the existing
-repository before each milestone, make implementation decisions, write and
-refactor TypeScript, diagnose CI and generated-artifact failures, and review
-the final diffs before the user committed them.
-
-That collaboration produced the shared application-service layer, exact
-evidence verification, TTY selected-item review, the authenticated loopback
-UI, deterministic demo generation, and offline release CI. Focused regression
-tests were added whenever review found an edge case, including proposal replay,
-concurrent previews, browser-launch failure, mock-mode network isolation, and
-generated-page drift. The user reviewed each milestone before staging and kept
-the approved `.parallax` store, rather than model output, as the project source
-of truth.
-
-The required `/feedback` Session ID is supplied directly in the hackathon
-submission and is intentionally not committed to the repository.
 
 ## License
 

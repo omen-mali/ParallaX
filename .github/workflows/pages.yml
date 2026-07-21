@@ -33,7 +33,7 @@ jobs:
       - run: pnpm run demo:build
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: ./demo/site
+          path: ./docs
 
   deploy:
     needs: build

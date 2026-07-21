@@ -7,7 +7,6 @@ test-results/
 .parallax/.local/
 .parallax.local/
 .parallax-demo/
-docs/index.html
 .DS_Store
 AGENTS.md
 message.txt
