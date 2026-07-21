@@ -46,6 +46,24 @@ async function seedStore(
 }
 
 describe("parallax web CLI", () => {
+  it("keeps docs/index.html as the default user snapshot output", async () => {
+    const projectRoot = await tempRoot();
+    const storeRoot = resolveStoreRoot(projectRoot);
+    await seedStore(storeRoot, "Default web output decision", "default.md");
+
+    const cliPath = join(process.cwd(), "src/cli.ts");
+    const tsxPath = join(process.cwd(), "node_modules/tsx/dist/cli.mjs");
+
+    await execFileAsync(
+      process.execPath,
+      [tsxPath, cliPath, "web", "--root", projectRoot],
+      { env: { ...process.env, PARALLAX_MOCK: "1" } },
+    );
+
+    const html = await readFile(join(projectRoot, "docs", "index.html"), "utf8");
+    expect(html).toContain("Default web output decision");
+  });
+
   it("reads only the selected store when generating --out", async () => {
     const projectRoot = await tempRoot();
     const defaultStore = resolveStoreRoot(projectRoot);
