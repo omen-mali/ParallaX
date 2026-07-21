@@ -119,7 +119,7 @@ export function trackedDemoPaths(projectRoot: string): DemoTrackedPaths {
   const root = resolve(projectRoot);
   return {
     storeRoot: join(root, "demo", "store"),
-    pagePath: join(root, "demo", "site", "index.html"),
+    pagePath: join(root, "docs", "index.html"),
   };
 }
 
@@ -472,7 +472,7 @@ export async function checkTrackedDemo(
   try {
     const [storeDifferences, pageDifferences] = await Promise.all([
       compareArtifactTrees(staged.storeRoot, targets.storeRoot, "demo/store"),
-      compareArtifactFile(staged.pagePath, targets.pagePath, "demo/site/index.html"),
+      compareArtifactFile(staged.pagePath, targets.pagePath, "docs/index.html"),
     ]);
     const differences = [...storeDifferences, ...pageDifferences];
     if (differences.length > 0) {

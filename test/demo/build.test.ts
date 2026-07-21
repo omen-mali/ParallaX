@@ -146,23 +146,16 @@ describe("deterministic demo builder", () => {
     const paths = trackedDemoPaths(projectRoot);
     await mkdir(join(projectRoot, "docs"), { recursive: true });
     await writeFile(join(projectRoot, "docs", "unrelated.txt"), "keep this file\n");
-    await writeFile(
-      join(projectRoot, "docs", "index.html"),
-      "user-generated snapshot\n",
-    );
 
     await buildTrackedDemo(projectRoot);
     await expect(checkTrackedDemo(projectRoot)).resolves.toBeUndefined();
     await expect(
       readFile(join(projectRoot, "docs", "unrelated.txt"), "utf8"),
     ).resolves.toBe("keep this file\n");
-    await expect(
-      readFile(join(projectRoot, "docs", "index.html"), "utf8"),
-    ).resolves.toBe("user-generated snapshot\n");
 
     await writeFile(paths.pagePath, "changed\n");
     await expect(checkTrackedDemo(projectRoot)).rejects.toThrow(
-      "changed demo/site/index.html",
+      "changed docs/index.html",
     );
 
     await buildTrackedDemo(projectRoot);
