@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { stringify } from "yaml";
+import { z } from "zod";
 
 import { STORE_SCHEMA_VERSION, type NormalizedChat } from "../contract/types.js";
 import type { VerifiedImportDelta } from "../importer/verify.js";
 
-const STORE_DIRECTORY = ".parallax";
+export const DEFAULT_STORE_DIRECTORY = ".parallax";
 const ISO_NOW = () => new Date().toISOString();
+const AppliedAtSchema = z.string().datetime({ offset: true });
 
 export interface StorePaths {
   root: string;
@@ -20,8 +22,30 @@ export interface StorePaths {
   manifest: string;
 }
 
-export function storePaths(projectRoot: string): StorePaths {
-  const root = join(projectRoot, STORE_DIRECTORY);
+export function resolveStoreRoot(
+  projectRoot: string,
+  storePath = DEFAULT_STORE_DIRECTORY,
+): string {
+  if (storePath.length === 0 || isAbsolute(storePath)) {
+    throw new Error("--store must be a non-empty path relative to the project root.");
+  }
+
+  const resolvedProjectRoot = resolve(projectRoot);
+  const root = resolve(resolvedProjectRoot, storePath);
+  const relativePath = relative(resolvedProjectRoot, root);
+  if (
+    relativePath.length === 0 ||
+    relativePath === ".." ||
+    relativePath.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) ||
+    isAbsolute(relativePath)
+  ) {
+    throw new Error("--store must stay inside the project root.");
+  }
+  return root;
+}
+
+export function storePaths(storeRoot: string): StorePaths {
+  const root = resolve(storeRoot);
   return {
     root,
     sources: join(root, "sources"),
@@ -34,8 +58,8 @@ export function storePaths(projectRoot: string): StorePaths {
   };
 }
 
-export async function initializeStore(projectRoot: string): Promise<StorePaths> {
-  const paths = storePaths(projectRoot);
+export async function initializeStore(storeRoot: string): Promise<StorePaths> {
+  const paths = storePaths(storeRoot);
   await mkdir(paths.sources, { recursive: true });
   await mkdir(paths.decisions, { recursive: true });
 
@@ -45,7 +69,6 @@ export async function initializeStore(projectRoot: string): Promise<StorePaths> 
       stringify({
         schemaVersion: STORE_SCHEMA_VERSION,
         kind: "manifest",
-        createdAt: ISO_NOW(),
       }),
     ],
     [paths.tasks, "# ParallaX Tasks\n"],
@@ -69,11 +92,11 @@ export async function initializeStore(projectRoot: string): Promise<StorePaths> 
 }
 
 export async function sourceAlreadyImported(
-  projectRoot: string,
+  storeRoot: string,
   sourceId: string,
 ): Promise<boolean> {
   try {
-    await readFile(join(storePaths(projectRoot).sources, `${sourceId}.md`), "utf8");
+    await readFile(join(storePaths(storeRoot).sources, `${sourceId}.md`), "utf8");
     return true;
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -95,8 +118,8 @@ function sourceMarkdown(
   chat: NormalizedChat,
   rawHash: string,
   metadataOnly: boolean,
+  importedAt: string,
 ): string {
-  const now = ISO_NOW();
   const metadata = frontMatter({
     schemaVersion: STORE_SCHEMA_VERSION,
     kind: "source",
@@ -105,7 +128,7 @@ function sourceMarkdown(
     title: chat.title,
     rawHash,
     canonicalHash: chat.id.slice("src_".length),
-    importedAt: now,
+    importedAt,
     turnCount: chat.turns.length,
     metadataOnly,
   });
@@ -125,13 +148,7 @@ function taskBlock(
   item: VerifiedImportDelta["tasks"][number],
   createdAt: string,
 ): string {
-  const metadata = stringify({
-    id,
-    sourceId: item.evidence.sourceId,
-    turnIndex: item.evidence.turnIndex,
-    quoteHash: createHash("sha256").update(item.evidence.quote).digest("hex"),
-    createdAt,
-  }).trim();
+  const metadata = ownedMetadata(id, item.evidence, createdAt);
   const detail = item.detail === null ? "" : `\n\n  ${item.detail}`;
 
   return `\n<!-- PARALLAX:TASK\n${metadata}\n-->\n- [ ] ${item.title}${detail}\n\n> ${item.evidence.quote}\n<!-- PARALLAX:TASK:END -->\n`;
@@ -139,33 +156,68 @@ function taskBlock(
 
 function ownedBlock(
   kind: string,
-  id: string,
+  metadata: string,
   title: string,
   body: string,
   evidenceQuote: string,
 ): string {
-  return `\n<!-- PARALLAX:${kind}\nid: ${id}\n-->\n## ${title}\n\n${body}\n\n> ${evidenceQuote}\n<!-- PARALLAX:${kind}:END -->\n`;
+  return `\n<!-- PARALLAX:${kind}\n${metadata}\n-->\n## ${title}\n\n${body}\n\n> ${evidenceQuote}\n<!-- PARALLAX:${kind}:END -->\n`;
+}
+
+function ownedMetadata(
+  id: string,
+  evidence: VerifiedImportDelta["decisions"][number]["evidence"],
+  createdAt: string,
+): string {
+  return stringify({
+    id,
+    sourceId: evidence.sourceId,
+    turnIndex: evidence.turnIndex,
+    role: evidence.role,
+    startChar: evidence.startChar,
+    endChar: evidence.endChar,
+    quoteHash: createHash("sha256").update(evidence.quote).digest("hex"),
+    createdAt,
+    updatedAt: createdAt,
+  }).trim();
+}
+
+function resolveAppliedAt(appliedAt: string | undefined): string {
+  if (appliedAt === undefined) {
+    return ISO_NOW();
+  }
+
+  const parsed = AppliedAtSchema.safeParse(appliedAt);
+  if (!parsed.success) {
+    throw new Error("appliedAt must be an ISO 8601 timestamp with an offset.");
+  }
+  return parsed.data;
 }
 
 export interface ApplyImportOptions {
-  projectRoot: string;
+  storeRoot: string;
   chat: NormalizedChat;
   rawHash: string;
   delta: VerifiedImportDelta;
   metadataOnly: boolean;
+  /**
+   * Locally controlled application timestamp. This is never sourced from a
+   * model proposal and is primarily useful for reproducible fixture builds.
+   */
+  appliedAt?: string;
 }
 
 export async function applyImport(options: ApplyImportOptions): Promise<void> {
-  const paths = await initializeStore(options.projectRoot);
+  const now = resolveAppliedAt(options.appliedAt);
+  const paths = await initializeStore(options.storeRoot);
   const sourcePath = join(paths.sources, `${options.chat.id}.md`);
-  if (await sourceAlreadyImported(options.projectRoot, options.chat.id)) {
+  if (await sourceAlreadyImported(options.storeRoot, options.chat.id)) {
     throw new Error(`Source ${options.chat.id} was already imported.`);
   }
 
-  const now = ISO_NOW();
   await writeFile(
     sourcePath,
-    sourceMarkdown(options.chat, options.rawHash, options.metadataOnly),
+    sourceMarkdown(options.chat, options.rawHash, options.metadataOnly, now),
     "utf8",
   );
 
@@ -206,7 +258,13 @@ export async function applyImport(options: ApplyImportOptions): Promise<void> {
     const id = recordId("question", `${options.chat.id}:${item.evidence.quote}`);
     await appendFile(
       paths.questions,
-      ownedBlock("QUESTION", id, item.question, "Status: open", item.evidence.quote),
+      ownedBlock(
+        "QUESTION",
+        ownedMetadata(id, item.evidence, now),
+        item.question,
+        "Status: open",
+        item.evidence.quote,
+      ),
       "utf8",
     );
   }
@@ -215,7 +273,13 @@ export async function applyImport(options: ApplyImportOptions): Promise<void> {
     const id = recordId("term", `${options.chat.id}:${item.evidence.quote}`);
     await appendFile(
       paths.glossary,
-      ownedBlock("TERM", id, item.term, item.definition, item.evidence.quote),
+      ownedBlock(
+        "TERM",
+        ownedMetadata(id, item.evidence, now),
+        item.term,
+        item.definition,
+        item.evidence.quote,
+      ),
       "utf8",
     );
   }
@@ -225,7 +289,13 @@ export async function applyImport(options: ApplyImportOptions): Promise<void> {
     const body = `Operation: ${item.operation}\n\n${item.content}`;
     await appendFile(
       paths.specChanges,
-      ownedBlock("SPEC", id, item.section, body, item.evidence.quote),
+      ownedBlock(
+        "SPEC",
+        ownedMetadata(id, item.evidence, now),
+        item.section,
+        body,
+        item.evidence.quote,
+      ),
       "utf8",
     );
   }

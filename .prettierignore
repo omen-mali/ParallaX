@@ -1,0 +1,6 @@
+# User-owned store data and canonical generated artifacts are validated by their
+# own parsers and the deterministic demo drift check.
+.parallax/
+demo/store/
+docs/index.html
+demo/site/index.html

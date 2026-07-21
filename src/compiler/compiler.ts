@@ -120,9 +120,10 @@ export interface CompiledFile {
 
 export async function compileContext(
   projectRoot: string,
+  storeRoot: string,
   targets: CompileTarget[] = TARGETS.map(({ target }) => target),
 ): Promise<CompiledFile[]> {
-  const snapshot = await readStore(projectRoot);
+  const snapshot = await readStore(storeRoot);
   const managedContent = renderContext(snapshot);
   const selectedTargets = TARGETS.filter(({ target }) => targets.includes(target));
   if (selectedTargets.length !== targets.length) {

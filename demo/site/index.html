@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ParallaX Project Brain</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        --bg: #0a0a0a;
+        --fg: #f4f4f5;
+        --muted: #a1a1aa;
+        --faint: #71717a;
+        --panel: #111111;
+        --inset: #0e0e10;
+        --line: #27272a;
+        --accent: #a78bfa;
+        --accent-strong: #8b5cf6;
+        --live: #34d399;
+        --live-chip-bg: rgba(52, 211, 153, 0.1);
+        --live-chip-line: rgba(52, 211, 153, 0.25);
+        --chip: rgba(255, 255, 255, 0.05);
+        --chip-accent: rgba(139, 92, 246, 0.13);
+        --chip-accent-line: rgba(167, 139, 250, 0.35);
+        --chip-accent-fg: #c4b5fd;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+        --ease: cubic-bezier(0.4, 0, 0.2, 1);
+        --rail: rgba(139, 92, 246, 0.5);
+        --dot-done: #3f3f46;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #fafafa;
+          --fg: #0a0a0a;
+          --muted: #52525b;
+          --faint: #71717a;
+          --panel: #ffffff;
+          --inset: #fafafa;
+          --line: #e4e4e7;
+          --accent: #7c3aed;
+          --accent-strong: #6d28d9;
+          --live: #059669;
+          --live-chip-bg: rgba(5, 150, 105, 0.08);
+          --live-chip-line: rgba(5, 150, 105, 0.3);
+          --chip: #f4f4f5;
+          --chip-accent: rgba(124, 58, 237, 0.08);
+          --chip-accent-line: rgba(124, 58, 237, 0.25);
+          --chip-accent-fg: #6d28d9;
+          --rail: rgba(124, 58, 237, 0.45);
+          --dot-done: #d4d4d8;
+        }
+      }
+      body { max-width: 56rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--fg); }
+      h1 { margin: 0; font-size: 1.7rem; letter-spacing: -0.02em; }
+      h2 { margin: 0 0 0.75rem; font-size: 1.15rem; }
+      h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+      p, .lede { color: var(--muted); line-height: 1.5; }
+      a { color: var(--accent); }
+      a:hover { color: var(--accent-strong); }
+      header { margin-bottom: 1.5rem; }
+      .kicker { margin: 0 0 0.25rem; font-family: var(--mono); font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.22em; color: var(--accent); }
+      .brand-header { display: flex; align-items: flex-start; gap: 1rem; }
+      .brand-mark { flex: none; margin-top: 0.15rem; }
+      .brand-x { color: var(--accent); }
+      .lede { margin: 0.35rem 0 0; }
+      .meta { font-size: 0.8rem; color: var(--faint); font-family: var(--mono); }
+      .counts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.25rem 0; }
+      .count { background: var(--panel); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.55rem 0.75rem; font-size: 0.85rem; color: var(--faint); }
+      .count strong { display: block; font-size: 1.15rem; color: var(--fg); }
+      .controls { display: grid; gap: 0.75rem; margin: 1rem 0 1.75rem; padding: 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 0.6rem; }
+      .controls label { display: grid; gap: 0.35rem; font-size: 0.85rem; color: var(--muted); }
+      .controls input, .controls select { font: inherit; color: var(--fg); background: var(--inset); border: 1px solid var(--line); border-radius: 0.45rem; padding: 0.45rem 0.55rem; }
+      .controls input:focus-visible, .controls select:focus-visible { outline: 3px solid var(--chip-accent-line); outline-offset: 2px; }
+      .filter-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+      .filter-row label { flex: 1 1 10rem; }
+      section.block { margin: 2rem 0; }
+      section.block .kicker { margin: 0 0 0.2rem; }
+      .timeline { border-left: 2px solid var(--rail); margin: 1rem 0 0; padding-left: 1.35rem; }
+      article.record { position: relative; margin: 0 0 1rem; padding: 0.9rem 1rem; background: var(--panel); border: 1px solid var(--line); border-radius: 0.6rem; animation: rise 0.45s var(--ease) backwards; transition: border-color 0.2s var(--ease); }
+      article.record:hover { border-color: var(--chip-accent-line); }
+      .timeline article.record::before { content: ""; position: absolute; width: 0.65rem; height: 0.65rem; left: -1.79rem; top: 1.2rem; border-radius: 50%; background: var(--accent-strong); box-shadow: 0 0 10px var(--rail); }
+      .timeline article.record[data-status="done"]::before, .timeline article.record[data-status="other"]::before { background: var(--dot-done); box-shadow: none; }
+      .record-meta, .tags, .empty { font-size: 0.85rem; color: var(--muted); }
+      .tags { display: inline; margin-left: 0.35rem; }
+      .chip { display: inline-block; background: var(--chip-accent); border: 1px solid var(--chip-accent-line); color: var(--chip-accent-fg); border-radius: 0.3rem; padding: 0.08rem 0.4rem; margin: 0.1rem 0.2rem 0.1rem 0; font-size: 0.74rem; font-family: var(--mono); }
+      details.record-details { margin-top: 0.65rem; }
+      details.record-details summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
+      .detail-grid { display: grid; gap: 0.35rem; margin-top: 0.65rem; font-size: 0.9rem; }
+      .detail-grid dt { color: var(--faint); font-size: 0.8rem; }
+      .detail-grid dd { margin: 0 0 0.4rem; }
+      .evidence { margin-top: 0.5rem; padding: 0.65rem 0.75rem; border-left: 3px solid var(--accent-strong); background: var(--inset); border-radius: 0 0.35rem 0.35rem 0; }
+      .evidence-label { font-family: var(--mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin-bottom: 0.25rem; }
+      .provenance-note { font-size: 0.78rem; color: var(--faint); margin-top: 0.35rem; font-family: var(--mono); }
+      .hidden { display: none !important; }
+      .list { display: grid; gap: 0.75rem; }
+      .empty { position: relative; padding: 1rem 5rem 1rem 1rem; background: var(--inset); border: 1px dashed var(--line); border-radius: 0.6rem; }
+      .empty::after { content: ""; position: absolute; right: 0.8rem; top: 50%; width: 2.8rem; height: 2.5rem; transform: translateY(-50%) skewX(-10deg); opacity: 0.14; background: linear-gradient(#4f46e5, #4f46e5) right top / 58% 22% no-repeat, linear-gradient(#7c3aed, #7c3aed) left 55% center / 68% 22% no-repeat, linear-gradient(#8b5cf6, #8b5cf6) left bottom / 78% 22% no-repeat; }
+      @media (prefers-color-scheme: light) { .empty::after { opacity: 0.1; } }
+      @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="brand-header">
+      <svg class="brand-mark" width="44" height="44" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect x="2" y="2" width="60" height="60" rx="14" fill="#111111" stroke="#27272a" stroke-width="2"></rect>
+        <path d="M16 23 L26 32 L16 41" fill="none" stroke="#34d399" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M35 26 L41 32" fill="none" stroke="#b6a0fc" stroke-width="5" stroke-linecap="round"></path>
+        <path d="M47 26 L41 32" fill="none" stroke="#8b5cf6" stroke-width="5" stroke-linecap="round"></path>
+        <path d="M47 38 L41 32" fill="none" stroke="#6366f1" stroke-width="5" stroke-linecap="round"></path>
+        <path d="M35 38 L41 32" fill="none" stroke="#7c3aed" stroke-width="5" stroke-linecap="round"></path>
+        <circle cx="41" cy="32" r="6.2" fill="#8b5cf6" opacity="0.16"></circle>
+        <circle cx="41" cy="32" r="4.6" fill="#4c1d95"></circle>
+        <path d="M41 28.8 L42 31 L44.2 32 L42 33 L41 35.2 L40 33 L37.8 32 L40 31 Z" fill="#ede9fe"></path>
+        <rect x="35" y="44" width="12" height="4" rx="2" fill="#a78bfa"></rect>
+      </svg>
+      <div>
+        <p class="kicker">Project brain · Read-only</p>
+        <h1>Paralla<span class="brand-x">X</span></h1>
+        <p class="lede">Read-only explorer for the approved project brain. Generated from the selected store; nothing on this page edits the store.</p>
+        <p class="meta">Generated at <time id="generated-at"></time></p>
+      </div>
+    </header>
+    <div id="counts" class="counts" aria-live="polite"></div>
+    <div class="controls" id="controls">
+      <label>Search
+        <input id="search" type="search" placeholder="Filter by keyword" autocomplete="off" />
+      </label>
+      <div class="filter-row">
+        <label>Record type
+          <select id="type-filter">
+            <option value="all">All types</option>
+            <option value="decision">Decisions</option>
+            <option value="task">Tasks</option>
+            <option value="question">Questions</option>
+            <option value="glossary">Glossary</option>
+            <option value="spec">Spec changes</option>
+          </select>
+        </label>
+        <label>Status
+          <select id="status-filter">
+            <option value="all">All statuses</option>
+            <option value="active">Active / open</option>
+            <option value="done">Done / resolved / superseded</option>
+          </select>
+        </label>
+        <label>Tag
+          <select id="tag-filter">
+            <option value="all">All tags</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <main id="app"></main>
+    <script>
+      const snapshot = {"decisions":[{"id":"dec_34931babe715c899","title":"Keep project notes in one Markdown file","decision":"Keep project notes in one Markdown file","context":"Explicitly marked in the imported chat.","rationale":"The source chat labels this as a decision.","alternatives":[],"tags":["imported"],"status":"superseded","createdAt":"2025-01-15T09:00:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","evidence":{"quote":"Decision: Keep project notes in one Markdown file","sourceId":"src_97216971290a7dde126037267e0975e1e6fd2ab8ff6835c7abdb7a7cf18a5ffa","turnIndex":0,"role":"user","startChar":0,"endChar":49}},{"id":"dec_73bce182c674b00b","title":"Keep the approved project brain in versioned plain files","decision":"Keep the approved project brain in versioned plain files","context":"Explicitly marked in the imported chat.","rationale":"The source chat labels this as a decision.","alternatives":[],"tags":["imported"],"status":"active","createdAt":"2025-02-20T10:30:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","supersedes":"dec_34931babe715c899","evidence":{"quote":"Decision: Keep the approved project brain in versioned plain files","sourceId":"src_ac4e57be6bcc42f4b2c67683413a0efdf850f74db9ca79e44029113389fd3069","turnIndex":0,"role":"user","startChar":0,"endChar":66}},{"id":"dec_05107e5cdafa7df9","title":"Keep sensitive imports metadata-only","decision":"Keep sensitive imports metadata-only","context":"Explicitly marked in the imported chat.","rationale":"The source chat labels this as a decision.","alternatives":[],"tags":["imported"],"status":"active","createdAt":"2025-03-10T14:45:00.000Z","updatedAt":"2025-03-10T14:45:00.000Z","evidence":{"quote":"Decision: Keep sensitive imports metadata-only","sourceId":"src_d06359337fea4bf242221cb237dac6f1156f2af2dfe4273d4b4e6dc338a83e2d","turnIndex":0,"role":"user","startChar":0,"endChar":46}}],"tasks":[{"id":"task_094852d70e1e850d","title":"Migrate the original notes","status":"done","createdAt":"2025-01-15T09:00:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","evidence":{"quote":"Task: Migrate the original notes","quoteHash":"a82adb03efb9bcb20b591d311327a13788e7fa82c1ad6abe7987f7360c3d8349","sourceId":"src_97216971290a7dde126037267e0975e1e6fd2ab8ff6835c7abdb7a7cf18a5ffa","turnIndex":0,"role":"user","startChar":50,"endChar":82}},{"id":"task_cde0a1de72c20cc8","title":"Publish the generated explorer","status":"open","createdAt":"2025-02-20T10:30:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","evidence":{"quote":"Task: Publish the generated explorer","quoteHash":"0008079696629a595b11c9e1e8b79c9fc3597a212a0a3a79421890bf58b6a309","sourceId":"src_ac4e57be6bcc42f4b2c67683413a0efdf850f74db9ca79e44029113389fd3069","turnIndex":0,"role":"user","startChar":67,"endChar":103}},{"id":"task_395ed069dab83009","title":"Document retention boundaries","status":"open","createdAt":"2025-03-10T14:45:00.000Z","updatedAt":"2025-03-10T14:45:00.000Z","evidence":{"quote":"Task: Document retention boundaries","quoteHash":"4a2465aaa4eaa6e6d58099a451abe4852829978dcf2ef9fce7b7502d156633bf","sourceId":"src_d06359337fea4bf242221cb237dac6f1156f2af2dfe4273d4b4e6dc338a83e2d","turnIndex":0,"role":"user","startChar":47,"endChar":82}}],"questions":[{"id":"question_b17fb57c6a11bb53","question":"Which project notes should be promoted into the shared project brain?","status":"open","createdAt":"2025-01-15T09:00:00.000Z","updatedAt":"2025-01-15T09:00:00.000Z","evidence":{"quote":"Question: Which project notes should be promoted into the shared project brain?","quoteHash":"7c014e0cd1cd1fc1178f4469c06551f87e19f4fd46d7d733ee55a7cc1a5c73ba","sourceId":"src_97216971290a7dde126037267e0975e1e6fd2ab8ff6835c7abdb7a7cf18a5ffa","turnIndex":0,"role":"user","startChar":83,"endChar":162}},{"id":"question_2c559175f23582bd","question":"Should transcript retention remain opt-in?","status":"open","createdAt":"2025-02-20T10:30:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","evidence":{"quote":"Question: Should transcript retention remain opt-in?","quoteHash":"8ce506251432dfc7b4c87e66b881bc59571c238cf53a7f76374cdf04dea41fe0","sourceId":"src_ac4e57be6bcc42f4b2c67683413a0efdf850f74db9ca79e44029113389fd3069","turnIndex":0,"role":"user","startChar":104,"endChar":156}},{"id":"question_461c84287659496d","question":"Which release branch should publish the static explorer?","status":"open","createdAt":"2025-02-20T10:30:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","evidence":{"quote":"Question: Which release branch should publish the static explorer?","quoteHash":"8849558e583a1d37760540c2ebf7ee5dab7e82e16de974d67ee33b31d7e12874","sourceId":"src_ac4e57be6bcc42f4b2c67683413a0efdf850f74db9ca79e44029113389fd3069","turnIndex":0,"role":"user","startChar":325,"endChar":391}},{"id":"question_01c02718983002ae","question":"Which collaborators may access the retained source transcript?","status":"open","createdAt":"2025-03-10T14:45:00.000Z","updatedAt":"2025-03-10T14:45:00.000Z","evidence":{"quote":"Question: Which collaborators may access the retained source transcript?","quoteHash":"a115e1c8eceff05f6ccbe7532e9886c24e227ef0d2a2a059d68c7e3892f8aa29","sourceId":"src_d06359337fea4bf242221cb237dac6f1156f2af2dfe4273d4b4e6dc338a83e2d","turnIndex":0,"role":"user","startChar":83,"endChar":155}}],"glossary":[{"id":"term_f5db95615392f4da","term":"project brain","definition":"A versioned, repo-local record of approved project context","createdAt":"2025-01-15T09:00:00.000Z","updatedAt":"2025-01-15T09:00:00.000Z","evidence":{"quote":"Term: project brain - A versioned, repo-local record of approved project context","quoteHash":"6ff8ff7733a98276b03dad2ca90d497781f1f5f29f91c90ec6af6d8080c976c1","sourceId":"src_97216971290a7dde126037267e0975e1e6fd2ab8ff6835c7abdb7a7cf18a5ffa","turnIndex":0,"role":"user","startChar":163,"endChar":243}},{"id":"term_989658b919ca2d97","term":"provenance","definition":"Exact contiguous source evidence attached to an approved record","createdAt":"2025-02-20T10:30:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","evidence":{"quote":"Term: provenance - Exact contiguous source evidence attached to an approved record","quoteHash":"8d5ab2e2e9aefa496688ea584a6b095bb128824ef97adc196a3f6ce9b4851248","sourceId":"src_ac4e57be6bcc42f4b2c67683413a0efdf850f74db9ca79e44029113389fd3069","turnIndex":0,"role":"user","startChar":157,"endChar":239}},{"id":"term_38ca4eb017dca038","term":"managed region","definition":"The bounded document area ParallaX may update during compilation","createdAt":"2025-02-20T10:30:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","evidence":{"quote":"Term: managed region - The bounded document area ParallaX may update during compilation","quoteHash":"fff5afc486821739e0e6b5a3f65e56691dbe888ac726ea95f162c35427b47bd0","sourceId":"src_ac4e57be6bcc42f4b2c67683413a0efdf850f74db9ca79e44029113389fd3069","turnIndex":0,"role":"user","startChar":392,"endChar":479}},{"id":"term_001dfa67f3cfbe3a","term":"metadata-only import","definition":"An import that retains source identity and record evidence without storing transcript text","createdAt":"2025-03-10T14:45:00.000Z","updatedAt":"2025-03-10T14:45:00.000Z","evidence":{"quote":"Term: metadata-only import - An import that retains source identity and record evidence without storing transcript text","quoteHash":"9f3f484148ea4d0fd905ec068c062d328751f70346aefc58e9dda156e3282b29","sourceId":"src_d06359337fea4bf242221cb237dac6f1156f2af2dfe4273d4b4e6dc338a83e2d","turnIndex":0,"role":"user","startChar":156,"endChar":275}}],"specChanges":[{"id":"spec_8abc6e770740a60d","section":"Project context","operation":"add","content":"Keep approved decisions, tasks, questions, and terms in one reviewable project brain.","createdAt":"2025-01-15T09:00:00.000Z","updatedAt":"2025-01-15T09:00:00.000Z","evidence":{"quote":"Spec: add | Project context | Keep approved decisions, tasks, questions, and terms in one reviewable project brain.","quoteHash":"1529c43686f346ca78126840b5acca676f2b0bd34c46397ab40f2f155aa15a75","sourceId":"src_97216971290a7dde126037267e0975e1e6fd2ab8ff6835c7abdb7a7cf18a5ffa","turnIndex":0,"role":"user","startChar":244,"endChar":359}},{"id":"spec_0b406fca6b94d0d9","section":"Import workflow","operation":"revise","content":"Preserve verified evidence in every applied record.","createdAt":"2025-02-20T10:30:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","evidence":{"quote":"Spec: revise | Import workflow | Preserve verified evidence in every applied record.","quoteHash":"27093761bb540ded6e86264586bca0c3ca21d73c9a3e511f2febc5668a16a417","sourceId":"src_ac4e57be6bcc42f4b2c67683413a0efdf850f74db9ca79e44029113389fd3069","turnIndex":0,"role":"user","startChar":240,"endChar":324}},{"id":"spec_8da21db9d16e51da","section":"Review workflow","operation":"add","content":"Require explicit selection and approval before reviewed imports are written.","createdAt":"2025-02-20T10:30:00.000Z","updatedAt":"2025-02-20T10:30:00.000Z","evidence":{"quote":"Spec: add | Review workflow | Require explicit selection and approval before reviewed imports are written.","quoteHash":"104b307003abb087f30085fa732b66164a0d9ca39108041f40d37baecee939c3","sourceId":"src_ac4e57be6bcc42f4b2c67683413a0efdf850f74db9ca79e44029113389fd3069","turnIndex":0,"role":"user","startChar":480,"endChar":586}},{"id":"spec_bfcbce0405a44024","section":"Retention boundary","operation":"add","content":"Show that source transcript retention was disabled wherever metadata-only evidence is displayed.","createdAt":"2025-03-10T14:45:00.000Z","updatedAt":"2025-03-10T14:45:00.000Z","evidence":{"quote":"Spec: add | Retention boundary | Show that source transcript retention was disabled wherever metadata-only evidence is displayed.","quoteHash":"62e84f299e75595baea18bb8b3760abc12213c962ab1c23a81720077e5cc39a5","sourceId":"src_d06359337fea4bf242221cb237dac6f1156f2af2dfe4273d4b4e6dc338a83e2d","turnIndex":0,"role":"user","startChar":276,"endChar":405}}],"sources":[{"id":"src_97216971290a7dde126037267e0975e1e6fd2ab8ff6835c7abdb7a7cf18a5ffa","title":"Initial project direction","metadataOnly":false,"importedAt":"2025-01-15T09:00:00.000Z"},{"id":"src_ac4e57be6bcc42f4b2c67683413a0efdf850f74db9ca79e44029113389fd3069","title":"Current project direction","metadataOnly":false,"importedAt":"2025-02-20T10:30:00.000Z"},{"id":"src_d06359337fea4bf242221cb237dac6f1156f2af2dfe4273d4b4e6dc338a83e2d","title":"Retention boundary","metadataOnly":true,"importedAt":"2025-03-10T14:45:00.000Z"}],"omittedRecordCount":0,"generatedAt":"2025-03-11T12:00:00.000Z"};
+      const app = document.querySelector("#app");
+      const counts = document.querySelector("#counts");
+      const generatedAt = document.querySelector("#generated-at");
+      const searchInput = document.querySelector("#search");
+      const typeFilter = document.querySelector("#type-filter");
+      const statusFilter = document.querySelector("#status-filter");
+      const tagFilter = document.querySelector("#tag-filter");
+      const sourcesById = new Map((snapshot.sources || []).map((source) => [source.id, source]));
+
+      generatedAt.dateTime = snapshot.generatedAt;
+      generatedAt.textContent = new Date(snapshot.generatedAt).toLocaleString();
+
+      function text(value) {
+        return value == null ? "" : String(value);
+      }
+
+      function matchesKeyword(haystack, query) {
+        if (!query) return true;
+        return haystack.toLowerCase().includes(query);
+      }
+
+      function statusBucket(status) {
+        if (status === "active" || status === "open") return "active";
+        if (status === "done" || status === "resolved" || status === "superseded") return "done";
+        return "other";
+      }
+
+      function appendCount(label, value) {
+        const item = document.createElement("div");
+        item.className = "count";
+        const strong = document.createElement("strong");
+        strong.textContent = String(value);
+        item.append(strong, document.createTextNode(label));
+        counts.append(item);
+      }
+
+      const decisions = snapshot.decisions || [];
+      const tasks = snapshot.tasks || [];
+      const activeDecisions = decisions.filter((decision) => decision.status === "active");
+      const openTasks = tasks.filter((task) => task.status === "open");
+      const openQuestions = (snapshot.questions || []).filter((q) => q.status === "open");
+      appendCount("Active decisions", activeDecisions.length);
+      appendCount("Open tasks", openTasks.length);
+      appendCount("Open questions", openQuestions.length);
+      appendCount("Glossary terms", (snapshot.glossary || []).length);
+      appendCount("Spec changes", (snapshot.specChanges || []).length);
+
+      const allTags = [...new Set(
+        (snapshot.decisions || []).flatMap((decision) => decision.tags || [])
+      )].sort();
+      for (const tag of allTags) {
+        const option = document.createElement("option");
+        option.value = tag;
+        option.textContent = "#" + tag;
+        tagFilter.append(option);
+      }
+
+      function emptyState(message) {
+        const p = document.createElement("p");
+        p.className = "empty";
+        p.textContent = message;
+        return p;
+      }
+
+      function evidenceBlock(evidence) {
+        const wrap = document.createElement("div");
+        wrap.className = "evidence";
+        const label = document.createElement("div");
+        label.className = "evidence-label";
+        label.textContent = "Evidence";
+        const quote = document.createElement("blockquote");
+        quote.textContent = evidence && evidence.quote ? evidence.quote : "";
+        wrap.append(label, quote);
+
+        if (evidence && evidence.sourceId) {
+          const meta = document.createElement("div");
+          meta.className = "provenance-note";
+          const parts = ["Source " + evidence.sourceId];
+          if (typeof evidence.turnIndex === "number") {
+            parts.push("turn " + evidence.turnIndex);
+          }
+          meta.textContent = parts.join(" · ");
+          wrap.append(meta);
+
+          const source = sourcesById.get(evidence.sourceId);
+          if (source && source.metadataOnly) {
+            const note = document.createElement("div");
+            note.className = "provenance-note";
+            note.textContent = "Transcript retention was disabled.";
+            wrap.append(note);
+          }
+        } else if (evidence && evidence.quote) {
+          const note = document.createElement("div");
+          note.className = "provenance-note";
+          note.textContent = "Stored evidence quote only (no source id on this record).";
+          wrap.append(note);
+        }
+        return wrap;
+      }
+
+      function detailItem(term, value) {
+        const dt = document.createElement("dt");
+        dt.textContent = term;
+        const dd = document.createElement("dd");
+        dd.textContent = value;
+        return [dt, dd];
+      }
+
+      function detailsPanel(entries, evidence) {
+        const details = document.createElement("details");
+        details.className = "record-details";
+        const summary = document.createElement("summary");
+        summary.textContent = "Record details";
+        const grid = document.createElement("dl");
+        grid.className = "detail-grid";
+        for (const [term, value] of entries) {
+          if (value == null || value === "") continue;
+          grid.append(...detailItem(term, value));
+        }
+        details.append(summary, grid, evidenceBlock(evidence));
+        return details;
+      }
+
+      function createRecord(options) {
+        const article = document.createElement("article");
+        article.className = "record";
+        article.dataset.type = options.type;
+        article.dataset.status = statusBucket(options.status);
+        article.dataset.tags = (options.tags || []).join(" ");
+        article.dataset.search = options.searchText.toLowerCase();
+
+        const title = document.createElement("h3");
+        title.textContent = options.title;
+        const meta = document.createElement("div");
+        meta.className = "record-meta";
+        meta.textContent = options.metaLine;
+        if (options.tags && options.tags.length > 0) {
+          const tags = document.createElement("span");
+          tags.className = "tags";
+          for (const tag of options.tags) {
+            const chip = document.createElement("span");
+            chip.className = "chip";
+            chip.textContent = "#" + tag;
+            tags.append(chip);
+          }
+          meta.append(tags);
+        }
+        const body = document.createElement("p");
+        body.textContent = options.body;
+        article.append(title, meta, body, detailsPanel(options.detailEntries, options.evidence));
+        return article;
+      }
+
+      function section(id, type, kickerText, titleText) {
+        const block = document.createElement("section");
+        block.className = "block";
+        block.id = id;
+        block.dataset.type = type;
+        const kicker = document.createElement("p");
+        kicker.className = "kicker";
+        kicker.textContent = kickerText;
+        const heading = document.createElement("h2");
+        heading.textContent = titleText;
+        block.append(kicker, heading);
+        return block;
+      }
+
+      const decisionsSection = section("decisions", "decision", "Timeline", "Decisions.");
+      const timeline = document.createElement("div");
+      timeline.className = "timeline";
+      if (decisions.length === 0) {
+        timeline.append(emptyState("No approved decisions yet."));
+      } else {
+        for (const decision of decisions) {
+          timeline.append(
+            createRecord({
+              type: "decision",
+              status: decision.status,
+              tags: decision.tags || [],
+              title: decision.title,
+              metaLine: new Date(decision.createdAt).toLocaleString() + " · " + decision.status,
+              body: decision.decision,
+              searchText: [decision.title, decision.decision, decision.context, decision.rationale, (decision.tags || []).join(" "), decision.evidence && decision.evidence.quote]
+                .map(text).join(" "),
+              detailEntries: [
+                ["ID", decision.id],
+                ["Status", decision.status],
+                ["Created", decision.createdAt],
+                ["Updated", decision.updatedAt],
+                ["Context", decision.context],
+                ["Rationale", decision.rationale],
+                ["Alternatives", (decision.alternatives || []).join("; ")],
+                ["Supersedes", decision.supersedes],
+                ["Source ID", decision.evidence && decision.evidence.sourceId],
+                ["Turn index", decision.evidence && typeof decision.evidence.turnIndex === "number" ? String(decision.evidence.turnIndex) : ""],
+              ],
+              evidence: decision.evidence,
+            }),
+          );
+        }
+      }
+      decisionsSection.append(timeline);
+
+      const tasksSection = section("tasks", "task", "Backlog", "Tasks.");
+      const taskList = document.createElement("div");
+      taskList.className = "list";
+      if (tasks.length === 0) {
+        taskList.append(emptyState("No tasks recorded."));
+      } else {
+        for (const task of tasks) {
+          taskList.append(
+            createRecord({
+              type: "task",
+              status: task.status,
+              tags: [],
+              title: task.title,
+              metaLine: task.status + (task.createdAt ? " · " + new Date(task.createdAt).toLocaleString() : ""),
+              body: task.detail || task.title,
+              searchText: [task.title, task.detail, task.evidence && task.evidence.quote].map(text).join(" "),
+              detailEntries: [
+                ["ID", task.id],
+                ["Status", task.status],
+                ["Created", task.createdAt],
+                ["Source ID", task.evidence && task.evidence.sourceId],
+                ["Turn index", task.evidence && typeof task.evidence.turnIndex === "number" ? String(task.evidence.turnIndex) : ""],
+              ],
+              evidence: task.evidence,
+            }),
+          );
+        }
+      }
+      tasksSection.append(taskList);
+
+      const questionsSection = section("questions", "question", "Open loops", "Questions.");
+      const questionList = document.createElement("div");
+      questionList.className = "list";
+      const questions = snapshot.questions || [];
+      if (questions.length === 0) {
+        questionList.append(emptyState("No questions recorded."));
+      } else {
+        for (const question of questions) {
+          questionList.append(
+            createRecord({
+              type: "question",
+              status: question.status,
+              tags: [],
+              title: question.question,
+              metaLine: question.status,
+              body: question.question,
+              searchText: [question.question, question.evidence && question.evidence.quote].map(text).join(" "),
+              detailEntries: [
+                ["ID", question.id],
+                ["Status", question.status],
+              ],
+              evidence: question.evidence,
+            }),
+          );
+        }
+      }
+      questionsSection.append(questionList);
+
+      const glossarySection = section("glossary", "glossary", "Vocabulary", "Glossary.");
+      const glossaryList = document.createElement("div");
+      glossaryList.className = "list";
+      const glossary = snapshot.glossary || [];
+      if (glossary.length === 0) {
+        glossaryList.append(emptyState("No glossary terms recorded."));
+      } else {
+        for (const term of glossary) {
+          glossaryList.append(
+            createRecord({
+              type: "glossary",
+              status: "active",
+              tags: [],
+              title: term.term,
+              metaLine: "glossary",
+              body: term.definition,
+              searchText: [term.term, term.definition, term.evidence && term.evidence.quote].map(text).join(" "),
+              detailEntries: [
+                ["ID", term.id],
+              ],
+              evidence: term.evidence,
+            }),
+          );
+        }
+      }
+      glossarySection.append(glossaryList);
+
+      const specSection = section("spec-changes", "spec", "Contract", "Spec changes.");
+      const specList = document.createElement("div");
+      specList.className = "list";
+      const specs = snapshot.specChanges || [];
+      if (specs.length === 0) {
+        specList.append(emptyState("No spec changes recorded."));
+      } else {
+        for (const spec of specs) {
+          specList.append(
+            createRecord({
+              type: "spec",
+              status: "active",
+              tags: [],
+              title: spec.section,
+              metaLine: "Operation: " + spec.operation,
+              body: spec.content,
+              searchText: [spec.section, spec.operation, spec.content, spec.evidence && spec.evidence.quote].map(text).join(" "),
+              detailEntries: [
+                ["ID", spec.id],
+                ["Operation", spec.operation],
+              ],
+              evidence: spec.evidence,
+            }),
+          );
+        }
+      }
+      specSection.append(specList);
+
+      app.append(decisionsSection, tasksSection, questionsSection, glossarySection, specSection);
+
+      function applyFilters() {
+        const query = searchInput.value.trim().toLowerCase();
+        const type = typeFilter.value;
+        const status = statusFilter.value;
+        const tag = tagFilter.value;
+        for (const record of app.querySelectorAll("article.record")) {
+          const typeOk = type === "all" || record.dataset.type === type;
+          const statusOk = status === "all" || record.dataset.status === status;
+          const tagOk = tag === "all" || (record.dataset.tags || "").split(" ").includes(tag);
+          const searchOk = matchesKeyword(record.dataset.search || "", query);
+          record.classList.toggle("hidden", !(typeOk && statusOk && tagOk && searchOk));
+        }
+        for (const block of app.querySelectorAll("section.block")) {
+          block.classList.toggle(
+            "hidden",
+            !(type === "all" || block.dataset.type === type),
+          );
+        }
+      }
+
+      searchInput.addEventListener("input", applyFilters);
+      typeFilter.addEventListener("change", applyFilters);
+      statusFilter.addEventListener("change", applyFilters);
+      tagFilter.addEventListener("change", applyFilters);
+    </script>
+  </body>
+</html>

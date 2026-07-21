@@ -17,6 +17,7 @@ import { verifyImportDelta } from "../../src/importer/verify.js";
 import {
   applyImport,
   initializeStore,
+  resolveStoreRoot,
   sourceAlreadyImported,
 } from "../../src/store/store.js";
 
@@ -38,17 +39,18 @@ describe("generic import pipeline", () => {
       emptyDigest,
     );
     const root = await mkdtemp(join(tmpdir(), "parallax-test-"));
+    const storeRoot = resolveStoreRoot(root);
 
-    await initializeStore(root);
+    await initializeStore(storeRoot);
     await applyImport({
-      projectRoot: root,
+      storeRoot,
       chat: parsed.chat,
       rawHash: parsed.rawHash,
       delta: proposal,
       metadataOnly: false,
     });
 
-    expect(await sourceAlreadyImported(root, parsed.chat.id)).toBe(true);
+    expect(await sourceAlreadyImported(storeRoot, parsed.chat.id)).toBe(true);
     await expect(
       readFile(join(root, ".parallax", "tasks.md"), "utf8"),
     ).resolves.toContain("Add marker tests");
